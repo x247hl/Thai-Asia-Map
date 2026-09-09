@@ -1253,7 +1253,7 @@
       <div class="route-field">
         <label for="routeStartSelect" class="route-label">Điểm xuất phát:</label>
         <select id="routeStartSelect" class="route-select">
-          <option value="restaurant">🏪 Tại quán (Thai Asia SushiBar)</option>
+          <option value="restaurant">🏪 Tại quán</option>
         </select>
       </div>
 
@@ -1418,9 +1418,10 @@
     const shipperLayer = L.layerGroup().addTo(map);
     const routeLayerGroup = L.layerGroup().addTo(map);
 
+    const ROUTE_START_TYPE_KEY = "thaiasia.routeStartType";
     const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
     let routeOrderKeys = [];
-    let routeStartType = "restaurant";
+    let routeStartType = localStorage.getItem(ROUTE_START_TYPE_KEY) || "restaurant";
     let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
     let routePolylineOutline = null;
     let routePolylineInner = null;
@@ -1659,6 +1660,9 @@
     if (els.routeStartSelect) {
       els.routeStartSelect.addEventListener("change", () => {
         routeStartType = els.routeStartSelect.value;
+        try {
+          localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
+        } catch (err) { }
         if (typeof calculateAndDrawRoute === "function") {
           calculateAndDrawRoute();
         }
@@ -2117,9 +2121,9 @@
 
     function updateRouteStartOptions() {
       if (!els.routeStartSelect) return;
-      const prevVal = els.routeStartSelect.value || routeStartType;
+      const savedStart = localStorage.getItem(ROUTE_START_TYPE_KEY) || routeStartType || "restaurant";
       els.routeStartSelect.innerHTML = `
-        <option value="restaurant">🏪 Tại quán (Thai Asia SushiBar)</option>
+        <option value="restaurant">🏪 Tại quán</option>
       `;
 
       if (Array.isArray(lastShippers)) {
@@ -2127,16 +2131,16 @@
           if (!isShipperVisible(shipper)) return;
           const key = getShipperKey(shipper);
           const name = shipper?.user?.name || shipper?.name || "Shipper";
-          const online = shipper?.is_online === true;
           const opt = document.createElement("option");
           opt.value = `shipper:${key}`;
-          opt.textContent = `🚗 ${name} (${online ? "Online" : "Offline"})`;
+          opt.textContent = `🚗 ${name}`;
           els.routeStartSelect.appendChild(opt);
         });
       }
 
-      if (els.routeStartSelect.querySelector && els.routeStartSelect.querySelector(`option[value="${prevVal}"]`)) {
-        els.routeStartSelect.value = prevVal;
+      if (els.routeStartSelect.querySelector && els.routeStartSelect.querySelector(`option[value="${savedStart}"]`)) {
+        els.routeStartSelect.value = savedStart;
+        routeStartType = savedStart;
       } else {
         els.routeStartSelect.value = "restaurant";
         routeStartType = "restaurant";
