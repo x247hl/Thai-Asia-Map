@@ -306,13 +306,22 @@
       lng: 12.01689
     };
 
-    const DEFAULT_ZOOM_DESKTOP = 14;
-    const DEFAULT_ZOOM_MOBILE = 14;
+    const DEFAULT_ZOOM_WEB = 12;
+    const DEFAULT_ZOOM_ANDROID = 12;
+    const DEFAULT_ZOOM_IPHONE = 11;
 
     function getDefaultZoom() {
-      return window.matchMedia("(max-width: 768px)").matches
-        ? DEFAULT_ZOOM_MOBILE
-        : DEFAULT_ZOOM_DESKTOP;
+      const platform = navigator.userAgent || navigator.platform || "";
+
+      if (/iPhone|iPad|iPod/i.test(platform)) {
+        return DEFAULT_ZOOM_IPHONE;
+      }
+
+      if (/Android/i.test(platform)) {
+        return DEFAULT_ZOOM_ANDROID;
+      }
+
+      return DEFAULT_ZOOM_WEB;
     }
 
     // Mỗi lần mở trang, map luôn bắt đầu tại quán.
