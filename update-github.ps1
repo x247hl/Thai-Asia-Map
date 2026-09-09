@@ -13,6 +13,8 @@ $targetFiles = @(
   "icon-180.png",
   "icon-192.png",
   "icon-512.png",
+  "shipper-car-top.png",
+  "shipper-car-side.png",
   "Update-GitHub.bat",
   "update-github.ps1"
 )
