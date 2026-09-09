@@ -269,8 +269,8 @@
     }
 
     .order-new { --order-color: #FF0000; }
-    .order-inprocess { --order-color: #f27618; }
-    .order-inprocess-scheduled { --order-color: #2f80ed; }
+    .order-inprocess { --order-color: #2f80ed; }
+    .order-inprocess-scheduled { --order-color: #6a0dad; }
     .order-complete { --order-color: #179b4c; }
     .order-cancel { --order-color: #777; }
 
@@ -805,9 +805,8 @@
             <div class="popup-line"><b>${escapeHtml(orderStatusText(status, order.status_title))}</b></div>
             ${fullName ? `<div class="popup-line">${escapeHtml(fullName)}</div>` : ""}
             ${fullAddress ? `<div class="popup-line">${escapeHtml(fullAddress)}</div>` : ""}
-            ${order.created_at ? `<div class="popup-line">${escapeHtml(formatOrderDateTime(order.created_at))}</div>` : ""}
+            ${order.created_at ? `<div class="popup-line">Ngày tạo: ${escapeHtml(formatOrderDateTime(order.created_at))}</div>` : ""}
             <div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>
-            ${order.payment ? `<div class="popup-line">Thanh toán: ${escapeHtml(order.payment)}</div>` : ""}
           </div>
         `;
 
