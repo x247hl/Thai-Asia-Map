@@ -50,7 +50,9 @@
       top: calc(10px + env(safe-area-inset-top));
       z-index: 1000;
       display: flex;
+      flex-wrap: wrap;
       gap: 7px;
+      max-width: calc(100vw - 20px);
       pointer-events: none;
     }
 
@@ -243,6 +245,7 @@
   <div class="summary">
     <div class="summary-pill"><b id="orderCount">0</b> đơn</div>
     <div class="summary-pill"><b id="shipperCount">0</b> shipper</div>
+    <div class="summary-pill">Zoom <b id="currentZoom">0</b></div>
   </div>
 
   <button id="filterButton" class="filter-button" type="button">⚙ Bộ lọc</button>
@@ -303,9 +306,18 @@
       lng: 12.01689
     };
 
+    const DEFAULT_ZOOM_DESKTOP = 14;
+    const DEFAULT_ZOOM_MOBILE = 14;
+
+    function getDefaultZoom() {
+      return window.matchMedia("(max-width: 768px)").matches
+        ? DEFAULT_ZOOM_MOBILE
+        : DEFAULT_ZOOM_DESKTOP;
+    }
+
     // Mỗi lần mở trang, map luôn bắt đầu tại quán.
     // Dữ liệu đơn/shipper tải xong sẽ KHÔNG tự kéo map sang chỗ khác.
-    const map = L.map("map").setView([RESTAURANT.lat, RESTAURANT.lng], 14);
+    const map = L.map("map").setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -344,7 +356,7 @@
         L.DomEvent.disableClickPropagation(container);
         L.DomEvent.on(button, "click", L.DomEvent.preventDefault)
                   .on(button, "click", () => {
-                    map.setView([RESTAURANT.lat, RESTAURANT.lng], 14);
+                    map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
                   });
         return container;
       }
@@ -367,9 +379,17 @@
       showShippers: document.getElementById("showShippers"),
       orderCount: document.getElementById("orderCount"),
       shipperCount: document.getElementById("shipperCount"),
+      currentZoom: document.getElementById("currentZoom"),
       shipperList: document.getElementById("shipperList"),
       lastUpdate: document.getElementById("lastUpdate")
     };
+
+    function updateZoomDisplay() {
+      els.currentZoom.textContent = String(map.getZoom());
+    }
+
+    map.on("zoomend", updateZoomDisplay);
+    updateZoomDisplay();
 
     els.filterButton.addEventListener("click", () => {
       els.filterPanel.classList.toggle("open");
