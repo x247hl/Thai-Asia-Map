@@ -486,8 +486,8 @@
     }
 
     .shipper-car-marker {
-      width: 32px;
-      height: 52px;
+      width: 22px;
+      height: 38px;
       position: relative;
       display: flex;
       align-items: center;
@@ -495,18 +495,18 @@
     }
 
     .shipper-car-body {
-      width: 28px;
-      height: 48px;
+      width: 18px;
+      height: 33px;
       transform-origin: center center;
       transition: transform .6s cubic-bezier(0.25, 1, 0.5, 1);
       display: flex;
       align-items: center;
       justify-content: center;
-      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .38));
+      filter: drop-shadow(0 2px 5px rgba(0, 0, 0, .35));
     }
 
     .shipper-car-offline {
-      filter: grayscale(1) opacity(0.55) drop-shadow(0 2px 4px rgba(0, 0, 0, .25));
+      filter: grayscale(1) opacity(0.5) drop-shadow(0 1px 3px rgba(0, 0, 0, .2));
     }
 
     .shipper-icon {
@@ -1451,40 +1451,55 @@
 
     function getShipperCarSvg() {
       return `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 70" width="28" height="48">
-          <!-- Bánh xe -->
-          <rect x="2" y="10" width="5" height="12" rx="2.5" fill="#1e293b"/>
-          <rect x="33" y="10" width="5" height="12" rx="2.5" fill="#1e293b"/>
-          <rect x="2" y="48" width="5" height="12" rx="2.5" fill="#1e293b"/>
-          <rect x="33" y="48" width="5" height="12" rx="2.5" fill="#1e293b"/>
-          
-          <!-- Thân xe đỏ -->
-          <path d="M7 16 C7 6, 13 2, 20 2 C27 2, 33 6, 33 16 L33 54 C33 64, 27 68, 20 68 C13 68, 7 64, 7 54 Z" fill="#DA251D" stroke="#8E0000" stroke-width="1.2"/>
-          
-          <!-- Kính trước -->
-          <path d="M10 20 C10 16, 14 14, 20 14 C26 14, 30 16, 30 20 L29 27 C29 28, 26 29, 20 29 C14 29, 11 28, 11 27 Z" fill="#1f2937"/>
-          
-          <!-- Kính sau -->
-          <path d="M11 48 C11 46, 14 45, 20 45 C26 45, 29 46, 29 48 L28 53 C28 55, 26 56, 20 56 C14 56, 12 55, 12 53 Z" fill="#1f2937"/>
-          
-          <!-- Cửa sổ hai bên -->
-          <path d="M9 28 L10 44 L12 44 L11 28 Z" fill="#1f2937"/>
-          <path d="M31 28 L30 44 L28 44 L29 28 Z" fill="#1f2937"/>
-          
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 44" width="18" height="33">
+          <defs>
+            <linearGradient id="carBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#B80710"/>
+              <stop offset="25%" stop-color="#E51A22"/>
+              <stop offset="50%" stop-color="#FF3333"/>
+              <stop offset="75%" stop-color="#E51A22"/>
+              <stop offset="100%" stop-color="#B80710"/>
+            </linearGradient>
+            <linearGradient id="glassGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#334155"/>
+              <stop offset="100%" stop-color="#0F172A"/>
+            </linearGradient>
+          </defs>
+
+          <!-- Bánh xe ẩn hốc -->
+          <rect x="0.5" y="7" width="2" height="7" rx="1" fill="#0F172A"/>
+          <rect x="21.5" y="7" width="2" height="7" rx="1" fill="#0F172A"/>
+          <rect x="0.5" y="28" width="2" height="7" rx="1" fill="#0F172A"/>
+          <rect x="21.5" y="28" width="2" height="7" rx="1" fill="#0F172A"/>
+
+          <!-- Thân xe khí động học -->
+          <path d="M 4,11 C 4,4 7.5,1 12,1 C 16.5,1 20,4 20,11 L 20.5,33 C 20.5,39.5 17.5,42.5 12,42.5 C 6.5,42.5 3.5,39.5 3.5,33 Z" fill="url(#carBodyGrad)" stroke="#7A0000" stroke-width="0.5"/>
+
           <!-- Gương chiếu hậu -->
-          <rect x="3" y="21" width="4" height="6" rx="2" fill="#DA251D" stroke="#8E0000" stroke-width="0.8"/>
-          <rect x="33" y="21" width="4" height="6" rx="2" fill="#DA251D" stroke="#8E0000" stroke-width="0.8"/>
+          <path d="M 3,14.5 C 1.5,14.5 1,15.5 1.5,17 C 2,18 3,18 3.5,17.5 Z" fill="#B80710"/>
+          <path d="M 21,14.5 C 22.5,14.5 23,15.5 22.5,17 C 22,18 21,18 20.5,17.5 Z" fill="#B80710"/>
+
+          <!-- Kính lái trước -->
+          <path d="M 6,13 C 6,10 8.5,8.5 12,8.5 C 15.5,8.5 18,10 18,13 L 17.5,17.5 C 17.5,18 15.5,18.5 12,18.5 C 8.5,18.5 6.5,18 6.5,17.5 Z" fill="url(#glassGrad)"/>
+          <path d="M 7.5,11.5 C 9,10 11,9.5 12,9.5 L 11.5,16.5 C 10.5,16.5 9,16 8,15 Z" fill="#FFFFFF" opacity="0.2"/>
+
+          <!-- Kính sau -->
+          <path d="M 6.5,30.5 C 7,30 9.5,29.5 12,29.5 C 14.5,29.5 17,30 17.5,30.5 L 17,34 C 16.5,35.5 14.5,36 12,36 C 9.5,36 7.5,35.5 7,34 Z" fill="url(#glassGrad)"/>
+
+          <!-- Cửa sổ hông -->
+          <path d="M 5.8,18.5 L 6.2,29.5 L 7.4,29 L 7,18.8 Z" fill="#1E293B"/>
+          <path d="M 18.2,18.5 L 17.8,29.5 L 16.6,29 L 17,18.8 Z" fill="#1E293B"/>
 
           <!-- Ngôi sao vàng trên nóc xe -->
-          <polygon points="20,31.5 21.8,35.3 25.8,35.6 22.8,38.3 23.7,42.3 20,40.1 16.3,42.3 17.2,38.3 14.2,35.6 18.2,35.3" fill="#FFFF00" stroke="#DDAA00" stroke-width="0.4"/>
-          
-          <!-- Đèn pha trước -->
-          <path d="M9 4 Q12 3 14 6 L10 7 Z" fill="#FFFBEB"/>
-          <path d="M31 4 Q28 3 26 6 L30 7 Z" fill="#FFFBEB"/>
-          
-          <!-- Đèn hậu đỏ -->
-          <rect x="9" y="64" width="5" height="3" rx="1.5" fill="#FF4444"/>
-          <rect x="26" y="64" width="5" height="3" rx="1.5" fill="#FF4444"/>
+          <polygon points="12,20.8 13.1,23.3 15.8,23.5 13.8,25.3 14.4,28 12,26.5 9.6,28 10.2,25.3 8.2,23.5 10.9,23.3" fill="#FFEB3B" stroke="#E6A100" stroke-width="0.3"/>
+
+          <!-- Đèn pha trước LED -->
+          <path d="M 5,3 C 7,2.5 8,4 6,5.5 Z" fill="#FFFFFF" opacity="0.9"/>
+          <path d="M 19,3 C 17,2.5 16,4 18,5.5 Z" fill="#FFFFFF" opacity="0.9"/>
+
+          <!-- Đèn hậu LED -->
+          <path d="M 5,40.5 C 6.5,41.5 8,41 6.5,39.5 Z" fill="#FF1A1A"/>
+          <path d="M 19,40.5 C 17.5,41.5 16,41 17.5,39.5 Z" fill="#FF1A1A"/>
         </svg>
       `;
     }
@@ -1512,8 +1527,8 @@
               </div>
             </div>
           `,
-          iconSize: [32, 52],
-          iconAnchor: [16, 26]
+          iconSize: [22, 38],
+          iconAnchor: [11, 19]
         });
 
         const popup = `
