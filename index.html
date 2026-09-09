@@ -1416,6 +1416,19 @@
 
     const orderLayer = L.layerGroup().addTo(map);
     const shipperLayer = L.layerGroup().addTo(map);
+    const routeLayerGroup = L.layerGroup().addTo(map);
+
+    const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
+    let routeOrderKeys = [];
+    let routeStartType = "restaurant";
+    let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
+    let routePolylineOutline = null;
+    let routePolylineInner = null;
+
+    let openedOrderKey = null;
+    let isRefreshingOrders = false;
+    let lastOrders = [];
+    let lastShippers = [];
 
     const restaurantIcon = L.divIcon({
       className: "",
@@ -1438,7 +1451,6 @@
 
     // Lưu trạng thái bật/tắt từng shipper.
     const shipperVisibility = loadShipperVisibility();
-    let lastShippers = [];
     let appUnlocked = false;
 
     const els = {
@@ -2076,14 +2088,6 @@
     }
 
     // ===== MULTI-STOP ROUTE PLANNER CORE =====
-    const routeLayerGroup = L.layerGroup().addTo(map);
-    const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
-    let routeOrderKeys = [];
-    let routeStartType = "restaurant";
-    let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
-    let routePolylineOutline = null;
-    let routePolylineInner = null;
-
     function updateRouteBadge() {
       const count = routeOrderKeys.length;
       if (els.routeBadge) {
