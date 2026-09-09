@@ -663,34 +663,30 @@
     .popup-items {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
 
     .popup-item {
       background: #f6f7f9;
       border-radius: 8px;
-      padding: 7px 8px;
-    }
-
-    .popup-item-main {
-      display: flex;
-      gap: 10px;
-      justify-content: space-between;
-      font-weight: 700;
+      padding: 6px 10px;
+      font-size: 13px;
+      line-height: 1.35;
     }
 
     .popup-item-name {
-      min-width: 0;
+      color: #1e293b;
+      word-break: break-word;
     }
 
-    .popup-item-price {
-      white-space: nowrap;
+    .popup-item-name b {
+      color: #0f172a;
+      font-weight: 700;
     }
 
-    .popup-item-meta {
-      color: #475569;
-      font-size: 12px;
-      margin-top: 3px;
+    .popup-item-note {
+      color: #d95300;
+      font-weight: 600;
     }
 
     @media (min-width: 769px) {
@@ -1262,22 +1258,23 @@
       if (!Array.isArray(items) || items.length === 0) return "";
 
       const rows = items.map(item => {
-        const codeText = item?.code ? `#${item.code} ` : "";
-        const name = `${codeText}${item?.product_name || "Món ăn"}`;
-        const quantity = item?.quantity ?? 0;
-        const unitPrice = formatEuro(item?.product_price);
-        const total = formatOrderItemTotal(item);
+        const quantity = Number(item?.quantity) || 1;
+        const rawCode = String(item?.code || "").replace(/^#+/, "").trim();
+        const rawName = String(item?.product_name || item?.name || "").trim();
+        const note = String(item?.note || "").trim();
+
+        let itemLabel = "";
+        if (rawCode) {
+          itemLabel = `${quantity}x ${rawCode}`;
+        } else {
+          itemLabel = `${quantity}x ${rawName || "Món ăn"}`;
+        }
 
         return `
           <div class="popup-item">
-            <div class="popup-item-main">
-              <span class="popup-item-name">${escapeHtml(name)}</span>
-              ${total ? `<span class="popup-item-price">${escapeHtml(total)}</span>` : ""}
-            </div>
-            <div class="popup-item-meta">
-              Số lượng: ${escapeHtml(quantity)}${unitPrice ? ` x ${escapeHtml(unitPrice)}` : ""}
-            </div>
-            ${item?.note ? `<div class="popup-item-meta">Ghi chú: ${escapeHtml(item.note)}</div>` : ""}
+            <span class="popup-item-name">
+              <b>${escapeHtml(itemLabel)}</b>${note ? `: <span class="popup-item-note">${escapeHtml(note)}</span>` : ""}
+            </span>
           </div>
         `;
       }).join("");
