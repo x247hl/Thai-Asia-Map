@@ -1421,6 +1421,8 @@
     const ROUTE_START_TYPE_KEY = "thaiasia.routeStartType";
     const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
     let routeOrderKeys = [];
+    let isRoutingArmed = false;
+    let lastInteractedOrderKey = null;
     let routeStartType = localStorage.getItem(ROUTE_START_TYPE_KEY) || "restaurant";
     let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
     let routePolylineOutline = null;
@@ -1447,6 +1449,8 @@
 
     restaurantMarker.on("click", () => {
       routeStartType = "restaurant";
+      isRoutingArmed = true;
+      lastInteractedOrderKey = null;
       try {
         localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
       } catch (err) {}
@@ -1455,6 +1459,7 @@
       }
       if (routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
+        toggleRoutePanel(true);
       }
     });
 
@@ -2107,17 +2112,54 @@
         marker.on("click", () => {
           stopFollowShipper();
           const inRoute = routeOrderKeys.includes(orderKey);
-          if (!inRoute) {
-            // Đơn chưa có trong lộ trình -> Nối nhanh vào tuyến, đóng popup để bản đồ thoáng
+
+          if (inRoute) {
+            // Đơn đã có trong lộ trình -> Mở chi tiết đơn
+            focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
+            marker.openPopup();
+            lastInteractedOrderKey = orderKey;
+            return;
+          }
+
+          if (isRoutingArmed || routeOrderKeys.length > 0) {
+            // Đã chọn shipper/quán hoặc đã có đơn trong tuyến -> Nối tiếp đơn này vào tuyến
             setTimeout(() => {
               marker.closePopup();
               map.closePopup();
             }, 0);
-            toggleOrderInRoute(orderKey);
-          } else {
-            // Đơn đã có trong lộ trình -> Mở chi tiết đơn
+            routeOrderKeys.push(orderKey);
+            isRoutingArmed = true;
+            lastInteractedOrderKey = orderKey;
+            renderRoutePanelUi();
+            calculateAndDrawRoute();
+            toggleRoutePanel(true);
+            return;
+          }
+
+          // Chưa kích hoạt nối ghép (vừa reload, chưa click shipper/quán):
+          if (!lastInteractedOrderKey || lastInteractedOrderKey === orderKey) {
+            // Lần click đầu tiên vào đơn -> Mở popup thông tin đơn hàng bình thường
+            lastInteractedOrderKey = orderKey;
             focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
             marker.openPopup();
+          } else {
+            // Trước đó đã click vào 1 đơn khác (ví dụ: đã xem #9 rồi tắt/chuyển qua #7) -> Nối ghép #9 và #7!
+            setTimeout(() => {
+              marker.closePopup();
+              map.closePopup();
+            }, 0);
+            const prevKey = lastInteractedOrderKey;
+            if (!routeOrderKeys.includes(prevKey)) {
+              routeOrderKeys.push(prevKey);
+            }
+            if (!routeOrderKeys.includes(orderKey)) {
+              routeOrderKeys.push(orderKey);
+            }
+            isRoutingArmed = true;
+            lastInteractedOrderKey = orderKey;
+            renderRoutePanelUi();
+            calculateAndDrawRoute();
+            toggleRoutePanel(true);
           }
         });
 
@@ -2278,8 +2320,15 @@
       const idx = routeOrderKeys.indexOf(orderKey);
       if (idx >= 0) {
         routeOrderKeys.splice(idx, 1);
+        if (routeOrderKeys.length === 0) {
+          isRoutingArmed = false;
+          lastInteractedOrderKey = null;
+        }
       } else {
         routeOrderKeys.push(orderKey);
+        isRoutingArmed = true;
+        lastInteractedOrderKey = orderKey;
+        toggleRoutePanel(true);
       }
       renderRoutePanelUi();
       calculateAndDrawRoute();
@@ -2303,6 +2352,10 @@
     window.removeRouteOrder = function (index) {
       if (index >= 0 && index < routeOrderKeys.length) {
         const removedKey = routeOrderKeys.splice(index, 1)[0];
+        if (routeOrderKeys.length === 0) {
+          isRoutingArmed = false;
+          lastInteractedOrderKey = null;
+        }
         renderRoutePanelUi();
         calculateAndDrawRoute();
         document.querySelectorAll(`.btn-toggle-route[data-order-key="${removedKey}"]`).forEach(btn => {
@@ -2314,6 +2367,8 @@
 
     function clearRoute() {
       routeOrderKeys = [];
+      isRoutingArmed = false;
+      lastInteractedOrderKey = null;
       routeLayerGroup.clearLayers();
       routePolylineOutline = null;
       routePolylineInner = null;
@@ -2573,6 +2628,8 @@
 
       // Đặt shipper này làm điểm xuất phát cho lộ trình
       routeStartType = `shipper:${key}`;
+      isRoutingArmed = true;
+      lastInteractedOrderKey = null;
       try {
         localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
       } catch (err) {}
@@ -2581,6 +2638,7 @@
       }
       if (routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
+        toggleRoutePanel(true);
       }
 
       // Nếu bấm lại vào chính shipper đang bám đuôi -> hủy bám đuôi
@@ -2988,6 +3046,8 @@
         marker.on("click", () => {
           const key = getShipperKey(shipper);
           routeStartType = `shipper:${key}`;
+          isRoutingArmed = true;
+          lastInteractedOrderKey = null;
           try {
             localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
           } catch (err) {}
@@ -2996,6 +3056,7 @@
           }
           if (routeOrderKeys.length > 0) {
             calculateAndDrawRoute();
+            toggleRoutePanel(true);
           }
         });
 
