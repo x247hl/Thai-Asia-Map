@@ -909,8 +909,23 @@
       return true;
     }
 
+    let lastHiddenAt = 0;
+
     async function handleAppResume() {
       if (document.hidden) return;
+
+      // Nếu app vừa quay lại từ chạy ẩn (ẩn ít nhất 1.5s), reload để nạp toàn bộ code & tính năng mới nhất từ GitHub
+      if (lastHiddenAt > 0 && (Date.now() - lastHiddenAt > 1500)) {
+        lastHiddenAt = 0;
+        if ("serviceWorker" in navigator) {
+          try {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg) await reg.update();
+          } catch (e) {}
+        }
+        window.location.reload();
+        return;
+      }
 
       if (!hasSavedAccess()) {
         lockApp();
@@ -1778,6 +1793,7 @@
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
+        lastHiddenAt = Date.now();
         stopPolling();
       } else {
         handleAppResume();
@@ -1785,7 +1801,9 @@
     });
 
     window.addEventListener("pageshow", event => {
-      if (!document.hidden) {
+      if (!document.hidden && event.persisted) {
+        window.location.reload();
+      } else if (!document.hidden) {
         handleAppResume();
       }
     });
@@ -1809,9 +1827,15 @@
   <script>
     if ("serviceWorker" in navigator && location.protocol === "https:") {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js").catch(err => {
+        navigator.serviceWorker.register("/sw.js").then(reg => {
+          reg.update();
+        }).catch(err => {
           console.warn("Service Worker không đăng ký được:", err);
         });
+      });
+
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        window.location.reload();
       });
     }
   </script>
