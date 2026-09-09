@@ -237,22 +237,21 @@
       height: 0;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
-      border-top: 8px solid var(--order-color);
-      filter: drop-shadow(0 1px 1px rgba(0,0,0,.2));
+      border-top: 8px solid rgba(255,255,255,.95);
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.16));
       transform: translateX(-50%);
     }
 
-    .order-marker-pointer::before {
+    .order-marker-pointer::after {
       content: "";
       position: absolute;
-      left: -8px;
-      top: -10px;
+      left: -4px;
+      top: -8px;
       width: 0;
       height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 10px solid rgba(255,255,255,.95);
-      z-index: -1;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid var(--order-color);
     }
 
     .order-marker-dot {
