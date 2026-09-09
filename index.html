@@ -1273,7 +1273,7 @@
       </div>
 
       <label class="route-toggle-row">
-        <input id="routeReturnToShop" type="checkbox" checked />
+        <input id="routeReturnToShop" type="checkbox" />
         <span>Quay về Quán khi giao xong</span>
       </label>
 
@@ -1654,8 +1654,12 @@
     }
 
     if (els.routeReturnToShop) {
+      els.routeReturnToShop.checked = routeReturnToShop;
       els.routeReturnToShop.addEventListener("change", () => {
         routeReturnToShop = els.routeReturnToShop.checked;
+        try {
+          localStorage.setItem(ROUTE_RETURN_TO_SHOP_KEY, routeReturnToShop ? "1" : "0");
+        } catch (err) { }
         if (typeof calculateAndDrawRoute === "function") {
           calculateAndDrawRoute();
         }
@@ -2073,9 +2077,10 @@
 
     // ===== MULTI-STOP ROUTE PLANNER CORE =====
     const routeLayerGroup = L.layerGroup().addTo(map);
+    const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
     let routeOrderKeys = [];
     let routeStartType = "restaurant";
-    let routeReturnToShop = true;
+    let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
     let routePolylineOutline = null;
     let routePolylineInner = null;
 
@@ -2140,6 +2145,10 @@
     function renderRoutePanelUi() {
       updateRouteStartOptions();
       updateRouteBadge();
+
+      if (els.routeReturnToShop) {
+        els.routeReturnToShop.checked = routeReturnToShop;
+      }
 
       if (!els.routeStopsList) return;
       els.routeStopsList.innerHTML = "";
