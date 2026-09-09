@@ -1195,6 +1195,51 @@
       border: none !important;
     }
 
+    .route-arrow-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      animation: arrowPulseFlow 1.6s ease-in-out infinite alternate;
+    }
+
+    .route-arrow-icon svg {
+      display: block;
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+    }
+
+    @keyframes arrowPulseFlow {
+      0% {
+        transform: scale(0.85);
+        opacity: 0.65;
+      }
+      50% {
+        transform: scale(1.15);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 0.85;
+      }
+    }
+
+    /* Flowing Navigation Stream on Route Polyline */
+    .route-flowing-line {
+      stroke-dasharray: 8, 14;
+      animation: routeStream 1.2s linear infinite;
+      pointer-events: none !important;
+    }
+
+    @keyframes routeStream {
+      from {
+        stroke-dashoffset: 22;
+      }
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
     @media (min-width: 769px) {
       .top-panel {
         right: 20px;
@@ -2364,9 +2409,20 @@
           lineCap: "round"
         }).addTo(routeLayerGroup);
 
-        // Add Directional Arrows along the polyline route (Phương án 2)
+        // Animated Flowing Navigation Stream along Route
+        L.polyline(latLngs, {
+          color: "#ffffff",
+          weight: 2.2,
+          opacity: 0.85,
+          className: "route-flowing-line",
+          lineJoin: "round",
+          lineCap: "round",
+          interactive: false
+        }).addTo(routeLayerGroup);
+
+        // Add Animated Directional Arrows along the polyline route
         let accumulatedDist = 0;
-        const ARROW_INTERVAL_METERS = 400; // Mỗi ~400m đặt 1 mũi tên chỉ hướng
+        const ARROW_INTERVAL_METERS = 380; // Mỗi ~380m đặt 1 mũi tên chỉ hướng
 
         for (let i = 0; i < latLngs.length - 1; i++) {
           const p1 = latLngs[i];
@@ -2383,14 +2439,14 @@
             const arrowIcon = L.divIcon({
               className: "route-arrow-marker",
               html: `
-                <div style="transform: rotate(${Math.round(bearing)}deg); display: flex; align-items: center; justify-content: center; width: 12px; height: 12px;">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#ffffff" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));">
+                <div class="route-arrow-icon" style="transform: rotate(${Math.round(bearing)}deg);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
                     <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
                   </svg>
                 </div>
               `,
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
+              iconSize: [14, 14],
+              iconAnchor: [7, 7]
             });
 
             L.marker([midLat, midLng], {
