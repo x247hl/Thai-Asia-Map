@@ -717,6 +717,11 @@
       <input id="showShippers" type="checkbox" checked />
     </label>
 
+    <label class="toggle-row">
+      <span>Hiện giao thông</span>
+      <input id="showTraffic" type="checkbox" checked />
+    </label>
+
     <div class="setting-shipper-list">
       <div class="shipper-list-title">Tất cả shipper</div>
       <div id="shipperSettingList">
@@ -777,11 +782,17 @@
       map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
     }
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      subdomains: "abcd",
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
+    L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+      maxZoom: 20,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"]
     }).addTo(map);
+
+    const trafficLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=traffic&x={x}&y={y}&z={z}", {
+      maxZoom: 20,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      opacity: 0.95,
+      zIndex: 500
+    });
 
     const orderLayer = L.layerGroup().addTo(map);
     const shipperLayer = L.layerGroup().addTo(map);
@@ -820,6 +831,7 @@
       statusFilter: document.getElementById("statusFilter"),
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
+      showTraffic: document.getElementById("showTraffic"),
       reloadButton: document.getElementById("reloadButton"),
       orderSummary: document.getElementById("orderSummary"),
       orderCount: document.getElementById("orderCount"),
@@ -991,6 +1003,23 @@
       } else if (map.hasLayer(shipperLayer)) {
         map.removeLayer(shipperLayer);
       }
+    });
+
+    const isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
+    els.showTraffic.checked = isTrafficEnabled;
+    if (isTrafficEnabled) {
+      trafficLayer.addTo(map);
+    }
+
+    els.showTraffic.addEventListener("change", () => {
+      if (els.showTraffic.checked) {
+        if (!map.hasLayer(trafficLayer)) trafficLayer.addTo(map);
+      } else if (map.hasLayer(trafficLayer)) {
+        map.removeLayer(trafficLayer);
+      }
+      try {
+        localStorage.setItem("thaiasia.showTraffic", els.showTraffic.checked ? "1" : "0");
+      } catch (err) {}
     });
 
     function escapeHtml(value) {
