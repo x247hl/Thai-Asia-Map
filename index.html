@@ -1093,8 +1093,57 @@
 
     .route-leg-row {
       display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: 6px;
+      padding: 2px 0;
+    }
+
+    .route-leg-label {
+      font-size: 11.5px;
+      color: #3730a3;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .route-swap-inline-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      height: 22px;
+      padding: 0 8px;
+      background: #ede9fe;
+      color: #6d28d9;
+      border: 1px solid #c4b5fd;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .route-swap-inline-btn:hover {
+      background: #7c3aed;
+      color: #ffffff;
+      border-color: #6d28d9;
+      box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+    }
+
+    .route-swap-inline-btn:active {
+      transform: scale(0.95);
+    }
+
+    .route-leg-stat {
+      font-size: 11px;
+      color: #3730a3;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .route-top-row {
@@ -1142,6 +1191,16 @@
 
     .route-mini-action-btn.primary:not(:disabled):hover {
       background: #ddd6fe;
+    }
+
+    .route-mini-action-btn.secondary {
+      background: #e0e7ff;
+      color: #4338ca;
+      border: 1px solid #c7d2fe;
+    }
+
+    .route-mini-action-btn.secondary:not(:disabled):hover {
+      background: #c7d2fe;
     }
 
     .route-mini-action-btn.danger {
@@ -1331,8 +1390,9 @@
         </label>
 
         <div class="route-top-actions">
+          <button id="routeReverseBtn" class="route-mini-action-btn secondary" type="button" title="Đảo ngược thứ tự giao đơn" disabled>⇄ Đảo</button>
           <button id="routeFitViewBtn" class="route-mini-action-btn primary" type="button" title="Xem toàn cảnh lộ trình" disabled>🔍 Toàn cảnh</button>
-          <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình" disabled>🗑️ Xóa lộ trình</button>
+          <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình" disabled>🗑️ Xóa</button>
         </div>
       </div>
 
@@ -1398,13 +1458,13 @@
     </div>
 
     <div class="update-row">
-      <span>Tự cập nhật</span>
+      <span>Cập nhật dữ liệu</span>
       <span id="lastUpdate">—</span>
     </div>
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v45</span>
+      <span style="font-weight: 700; color: #7c3aed;">v47</span>
     </div>
   </div>
 
@@ -1589,6 +1649,7 @@
       routeTotalTime: document.getElementById("routeTotalTime"),
       routeLegsList: document.getElementById("routeLegsList"),
       routeFitViewBtn: document.getElementById("routeFitViewBtn"),
+      routeReverseBtn: document.getElementById("routeReverseBtn"),
       routeClearBtn: document.getElementById("routeClearBtn"),
       statusFilter: document.getElementById("statusFilter"),
       showOrders: document.getElementById("showOrders"),
@@ -1814,6 +1875,14 @@
         } catch (err) { }
         if (typeof calculateAndDrawRoute === "function") {
           calculateAndDrawRoute();
+        }
+      });
+    }
+
+    if (els.routeReverseBtn) {
+      els.routeReverseBtn.addEventListener("click", () => {
+        if (typeof reverseRouteOrders === "function") {
+          reverseRouteOrders();
         }
       });
     }
@@ -2296,6 +2365,9 @@
       if (els.routeStopCount) {
         els.routeStopCount.textContent = `${count} đơn`;
       }
+      if (els.routeReverseBtn) {
+        els.routeReverseBtn.disabled = count < 2;
+      }
       if (els.routeFitViewBtn) {
         els.routeFitViewBtn.disabled = count === 0;
       }
@@ -2324,6 +2396,13 @@
         els.routeReturnToShop.checked = routeReturnToShop;
       }
     }
+
+    window.reverseRouteOrders = function () {
+      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
+      routeOrderKeys.reverse();
+      renderRoutePanelUi();
+      calculateAndDrawRoute();
+    };
 
     window.toggleOrderInRoute = function (orderKey) {
       if (!orderKey) return;
@@ -2662,11 +2741,20 @@
             const legDist = leg.distance < 1000 ? `${Math.round(leg.distance)}m` : `${(leg.distance / 1000).toFixed(1)}km`;
             const legMins = Math.max(1, Math.round(leg.duration / 60));
 
+            const isSingleOrderLeg = route.legs.length === 1 && routeOrderKeys.length >= 2;
+            const isOrderToOrderLeg = fromLabel.startsWith("Đơn #") && toLabel.startsWith("Đơn #");
+            const showSwapBtn = isSingleOrderLeg || isOrderToOrderLeg || (idx === 0 && routeOrderKeys.length >= 2 && route.legs.length <= 2);
+
             const row = document.createElement("div");
             row.className = "route-leg-row";
             row.innerHTML = `
-              <span>${escapeHtml(fromLabel)} ➔ ${escapeHtml(toLabel)}</span>
-              <b>${legDist} (~${legMins}p)</b>
+              <span class="route-leg-label">${escapeHtml(fromLabel)} ➔ ${escapeHtml(toLabel)}</span>
+              ${showSwapBtn ? `
+                <button type="button" class="route-swap-inline-btn" onclick="reverseRouteOrders()" title="Đảo ngược thứ tự giao (${escapeHtml(toLabel)} ➔ ${escapeHtml(fromLabel)})">
+                  ⇄ Đảo chiều
+                </button>
+              ` : `<span></span>`}
+              <b class="route-leg-stat">${legDist} (~${legMins}p)</b>
             `;
             els.routeLegsList.appendChild(row);
           });
