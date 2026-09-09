@@ -1195,32 +1195,36 @@
       border: none !important;
     }
 
-    .route-arrow-icon {
+    .route-arrow-wrap {
+      width: 14px;
+      height: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 14px;
-      height: 14px;
-      animation: arrowPulseFlow 1.6s ease-in-out infinite alternate;
+      transform-origin: center center;
     }
 
-    .route-arrow-icon svg {
+    .route-arrow-pulse {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: arrowPulse 1.4s ease-in-out infinite alternate;
+      transform-origin: center center;
+    }
+
+    .route-arrow-pulse svg {
       display: block;
-      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.85));
     }
 
-    @keyframes arrowPulseFlow {
+    @keyframes arrowPulse {
       0% {
         transform: scale(0.85);
-        opacity: 0.65;
-      }
-      50% {
-        transform: scale(1.15);
-        opacity: 1;
+        opacity: 0.7;
       }
       100% {
-        transform: scale(1);
-        opacity: 0.85;
+        transform: scale(1.2);
+        opacity: 1;
       }
     }
 
@@ -1233,10 +1237,10 @@
 
     @keyframes routeStream {
       from {
-        stroke-dashoffset: 22;
+        stroke-dashoffset: 0;
       }
       to {
-        stroke-dashoffset: 0;
+        stroke-dashoffset: -22;
       }
     }
 
@@ -2430,7 +2434,7 @@
           const segDist = calculateDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
           accumulatedDist += segDist;
 
-          if (accumulatedDist >= ARROW_INTERVAL_METERS && segDist > 8) {
+          if (accumulatedDist >= ARROW_INTERVAL_METERS && segDist >= 4) {
             accumulatedDist = 0;
             const bearing = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
             const midLat = (p1[0] + p2[0]) / 2;
@@ -2439,10 +2443,12 @@
             const arrowIcon = L.divIcon({
               className: "route-arrow-marker",
               html: `
-                <div class="route-arrow-icon" style="transform: rotate(${Math.round(bearing)}deg);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
-                    <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
-                  </svg>
+                <div class="route-arrow-wrap" style="transform: rotate(${Math.round(bearing)}deg);">
+                  <div class="route-arrow-pulse">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
+                      <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
+                    </svg>
+                  </div>
                 </div>
               `,
               iconSize: [14, 14],
