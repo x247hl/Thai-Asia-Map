@@ -1,5 +1,9 @@
 $ErrorActionPreference = "Stop"
 
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+  $env:PATH += ";C:\Program Files\Git\cmd;C:\Program Files\Git\bin;C:\Users\Chinh Thai Ba\AppData\Local\Programs\Git\bin"
+}
+
 Set-Location -LiteralPath $PSScriptRoot
 
 Write-Host "Thai Asia Map - update GitHub"

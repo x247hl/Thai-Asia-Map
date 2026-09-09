@@ -393,9 +393,9 @@
     .shipper-person-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       padding: 6px 0;
-      font-size: 14px;
+      font-size: 13px;
       white-space: nowrap;
     }
 
@@ -404,12 +404,12 @@
     }
 
     .shipper-person-row .name {
-      flex: 0 1 auto;
+      flex: 1 1 auto;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: calc(100vw - 86px);
+      font-weight: 600;
     }
 
     .shipper-focus-row {
@@ -421,11 +421,31 @@
       background: rgba(242, 118, 24, .12);
     }
 
-    .shipper-age {
-      margin-left: auto;
-      color: #8a8f9a;
-      font-size: 12px;
+    .shipper-eta {
+      font-size: 11px;
+      font-weight: 700;
+      color: #d95300;
+      background: #fff0e6;
+      border: 1px solid #ffd8c2;
+      padding: 2px 6px;
+      border-radius: 6px;
       white-space: nowrap;
+      line-height: 1.2;
+      flex-shrink: 0;
+    }
+
+    .shipper-eta.at-shop {
+      color: #179b4c;
+      background: #eafaf1;
+      border-color: #b7eed0;
+    }
+
+    .shipper-age {
+      color: #8a8f9a;
+      font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-left: 2px;
     }
 
     .setting-shipper-list {
@@ -1312,6 +1332,8 @@
       return shipperVisibility.get(key) !== false;
     }
 
+    const shipperMarkers = new Map();
+
     function focusShipper(shipper) {
       const lat = toNumber(shipper.latitude ?? shipper.lat);
       const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
@@ -1320,6 +1342,11 @@
       map.setView([lat, lng], SHIPPER_FOCUS_ZOOM, {
         animate: true
       });
+
+      const marker = shipperMarkers.get(getShipperKey(shipper));
+      if (marker) {
+        marker.openPopup();
+      }
     }
 
     function renderShipperStatus(shippers) {
@@ -1337,6 +1364,7 @@
         const name = shipper?.user?.name || shipper?.name || "Shipper";
         const online = shipper?.is_online === true;
         const age = formatRelativeTime(getShipperSeenAt(shipper));
+        const eta = shipper._eta;
 
         const row = document.createElement("div");
         row.className = "shipper-person-row shipper-focus-row";
@@ -1363,13 +1391,21 @@
         nameEl.className = "name";
         nameEl.textContent = name;
 
+        row.appendChild(icon);
+        row.appendChild(nameEl);
+
+        if (online && eta) {
+          const etaEl = document.createElement("span");
+          etaEl.className = "shipper-eta" + (eta.atRestaurant ? " at-shop" : "");
+          etaEl.textContent = eta.atRestaurant ? "Tại quán" : `${eta.etaText} (${eta.distText})`;
+          row.appendChild(etaEl);
+        }
+
         const ageEl = document.createElement("span");
         ageEl.className = "shipper-age";
         ageEl.textContent = age;
-
-        row.appendChild(icon);
-        row.appendChild(nameEl);
         row.appendChild(ageEl);
+
         els.shipperStatusList.appendChild(row);
       });
     }
@@ -1388,6 +1424,7 @@
         const name = shipper?.user?.name || shipper?.name || "Shipper";
         const online = shipper?.is_online === true;
         const age = formatRelativeTime(getShipperSeenAt(shipper));
+        const eta = shipper._eta;
 
         if (!shipperVisibility.has(key)) {
           shipperVisibility.set(key, true);
@@ -1417,19 +1454,28 @@
         nameEl.className = "name";
         nameEl.textContent = name;
 
-        const ageEl = document.createElement("span");
-        ageEl.className = "shipper-age";
-        ageEl.textContent = age;
-
         label.appendChild(checkbox);
         label.appendChild(icon);
         label.appendChild(nameEl);
+
+        if (online && eta) {
+          const etaEl = document.createElement("span");
+          etaEl.className = "shipper-eta" + (eta.atRestaurant ? " at-shop" : "");
+          etaEl.textContent = eta.atRestaurant ? "Tại quán" : `${eta.etaText} (${eta.distText})`;
+          label.appendChild(etaEl);
+        }
+
+        const ageEl = document.createElement("span");
+        ageEl.className = "shipper-age";
+        ageEl.textContent = age;
         label.appendChild(ageEl);
+
         els.shipperSettingList.appendChild(label);
       });
     }
 
     const shipperPrevPositions = new Map();
+    const shipperEtaCache = new Map();
 
     function calculateBearing(lat1, lon1, lat2, lon2) {
       const toRad = deg => (deg * Math.PI) / 180;
@@ -1458,6 +1504,91 @@
         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
       return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    async function getShipperEta(shipper, lat, lng) {
+      if (lat === null || lng === null) return null;
+
+      const key = getShipperKey(shipper);
+      const straightDist = calculateDistanceMeters(lat, lng, RESTAURANT.lat, RESTAURANT.lng);
+
+      if (straightDist < 60) {
+        return {
+          atRestaurant: true,
+          distanceMeters: straightDist,
+          durationSeconds: 0,
+          etaText: "Tại quán",
+          etaFullText: "Đang ở quán",
+          distText: `${Math.round(straightDist)} m`
+        };
+      }
+
+      const cached = shipperEtaCache.get(key);
+      const now = Date.now();
+
+      // Nếu vị trí di chuyển dưới 25m và cache trong vòng 60s -> dùng lại cache
+      if (cached && cached.lat != null && cached.lng != null) {
+        const moved = calculateDistanceMeters(cached.lat, cached.lng, lat, lng);
+        if (moved < 25 && (now - cached.timestamp < 60000)) {
+          return cached.data;
+        }
+      }
+
+      let routeData = null;
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${RESTAURANT.lng},${RESTAURANT.lat}?overview=false`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.code === "Ok" && Array.isArray(data.routes) && data.routes.length > 0) {
+            const route = data.routes[0];
+            routeData = {
+              distanceMeters: route.distance,
+              durationSeconds: route.duration
+            };
+          }
+        }
+      } catch (err) {
+        // Fallback sang công thức ước lượng nếu OSRM bị timeout / lỗi mạng
+      }
+
+      if (!routeData) {
+        const estDistance = straightDist * 1.35;
+        const estSpeedMs = (32 * 1000) / 3600;
+        routeData = {
+          distanceMeters: estDistance,
+          durationSeconds: Math.max(30, estDistance / estSpeedMs)
+        };
+      }
+
+      const mins = Math.round(routeData.durationSeconds / 60);
+      let etaText = mins <= 1 ? "~1p" : mins < 60 ? `~${mins}p` : `${Math.floor(mins / 60)}g${mins % 60}p`;
+      let etaFullText = mins <= 1 ? "~1 phút" : mins < 60 ? `~${mins} phút` : `~${Math.floor(mins / 60)} giờ ${mins % 60} phút`;
+      let distText = routeData.distanceMeters < 1000
+        ? `${Math.round(routeData.distanceMeters)} m`
+        : `${(routeData.distanceMeters / 1000).toFixed(1)} km`;
+
+      const result = {
+        atRestaurant: false,
+        distanceMeters: routeData.distanceMeters,
+        durationSeconds: routeData.durationSeconds,
+        etaText,
+        etaFullText,
+        distText
+      };
+
+      shipperEtaCache.set(key, {
+        lat,
+        lng,
+        timestamp: now,
+        data: result
+      });
+
+      return result;
     }
 
     function getShipperBearing(shipper, lat, lng) {
@@ -1490,6 +1621,7 @@
 
     function renderShippers(shippers) {
       shipperLayer.clearLayers();
+      shipperMarkers.clear();
 
       shippers.forEach(shipper => {
         if (!isShipperVisible(shipper)) return;
@@ -1501,6 +1633,7 @@
         const name = shipper?.user?.name || shipper?.name || "Shipper";
         const online = shipper?.is_online === true;
         const bearing = getShipperBearing(shipper, lat, lng);
+        const eta = shipper._eta;
 
         const icon = L.divIcon({
           className: "shipper-car-marker",
@@ -1513,19 +1646,35 @@
           iconAnchor: [8, 16]
         });
 
+        let etaPopupHtml = "";
+        if (online && eta) {
+          if (eta.atRestaurant) {
+            etaPopupHtml = `<div class="popup-line" style="color:#179b4c;font-weight:700;">📍 Đang ở quán</div>`;
+          } else {
+            etaPopupHtml = `
+              <div class="popup-line"><b>Về quán:</b> ${escapeHtml(eta.etaFullText)}</div>
+              <div class="popup-line"><b>Khoảng cách:</b> ${escapeHtml(eta.distText)}</div>
+            `;
+          }
+        }
+
         const popup = `
           <div>
             <div class="popup-title">${escapeHtml(name)}</div>
-            <div class="popup-line">${escapeHtml(shipper.speed ?? 0)} km/h</div>
+            <div class="popup-line"><b>Tốc độ:</b> ${escapeHtml(shipper.speed ?? 0)} km/h</div>
+            ${etaPopupHtml}
+            <div class="popup-line" style="color:#888;font-size:11px;margin-top:4px;">Cập nhật: ${escapeHtml(formatRelativeTime(getShipperSeenAt(shipper)))}</div>
           </div>
         `;
 
-        L.marker([lat, lng], {
+        const marker = L.marker([lat, lng], {
           icon,
           zIndexOffset: 2000
         })
           .bindPopup(popup)
           .addTo(shipperLayer);
+
+        shipperMarkers.set(getShipperKey(shipper), marker);
       });
 
       els.shipperCount.textContent =
@@ -1537,6 +1686,19 @@
       const shippers = unwrapList(payload);
 
       lastShippers = shippers;
+
+      await Promise.all(
+        shippers.map(async shipper => {
+          const lat = toNumber(shipper.latitude ?? shipper.lat);
+          const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
+          if (lat !== null && lng !== null && shipper.is_online === true) {
+            shipper._eta = await getShipperEta(shipper, lat, lng);
+          } else {
+            shipper._eta = null;
+          }
+        })
+      );
+
       renderShipperStatus(shippers);
       renderShipperFilter(shippers);
       renderShippers(shippers);
