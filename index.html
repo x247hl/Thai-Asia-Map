@@ -382,6 +382,30 @@
       --order-color: #179b4c;
     }
 
+    .order-complete-scheduled {
+      --order-color: #179b4c;
+    }
+
+    .order-complete-scheduled .order-marker-panel {
+      background: #179b4c;
+      color: #7e04d5;
+      border: 2px solid #7e04d5;
+      text-shadow: 0 0 2px #ffffff, 0 0 3px #ffffff, 0 0 1px #ffffff;
+    }
+
+    .order-complete-scheduled .order-marker-pointer {
+      border-top-color: #7e04d5;
+    }
+
+    .order-complete-scheduled .order-marker-pointer::after {
+      border-top-color: #179b4c;
+    }
+
+    .order-complete-scheduled .order-marker-dot {
+      background: #179b4c;
+      border-color: #7e04d5;
+    }
+
     .order-cancel {
       --order-color: #777;
     }
@@ -1382,7 +1406,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v57</span>
+      <span style="font-weight: 700; color: #7c3aed;">v61</span>
     </div>
   </div>
 
@@ -1933,7 +1957,48 @@
       );
     }
 
+    let productCatalog = new Map();
+    let productCatalogLoadedAt = 0;
+
+    async function loadProductCatalog() {
+      if (productCatalog.size > 0 && (Date.now() - productCatalogLoadedAt < 600000)) {
+        return productCatalog;
+      }
+      try {
+        const res = await fetchJson(`${API_BASE}/products`);
+        const categories = Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res?.data) ? res.data : []);
+        const map = new Map();
+        categories.forEach(cat => {
+          const types = Array.isArray(cat?.product_types) ? cat.product_types : (Array.isArray(cat?.types) ? cat.types : []);
+          types.forEach(pt => {
+            const prefixCode = pt?.prefix_code || null;
+            const products = Array.isArray(pt?.products) ? pt.products : [];
+            products.forEach(p => {
+              if (p?.id) {
+                map.set(String(p.id), {
+                  id: p.id,
+                  name: p.name || "",
+                  code: p.code != null ? String(p.code) : "",
+                  prefix_code: p.prefix_code || prefixCode || "",
+                  price: p.price
+                });
+              }
+            });
+          });
+        });
+        if (map.size > 0) {
+          productCatalog = map;
+          productCatalogLoadedAt = Date.now();
+        }
+        return productCatalog;
+      } catch (err) {
+        console.warn("Không tải được danh mục sản phẩm:", err);
+        return productCatalog;
+      }
+    }
+
     async function loadOrders() {
+      await loadProductCatalog();
       const selected = els.statusFilter.value;
 
       let statuses;
@@ -1987,7 +2052,10 @@
       const status = order?.status ?? "";
 
       if (status === "cancel") return "order-cancel";
-      if (status === "complete") return "order-complete";
+      if (status === "complete") {
+        if (isScheduledOrder(order)) return "order-complete-scheduled";
+        return "order-complete";
+      }
       if (isScheduledInprocessOrder(order)) return "order-inprocess-scheduled";
       if (status === "new") return "order-new";
       return "order-inprocess";
@@ -2120,21 +2188,46 @@
       return formatEuro(quantity * price);
     }
 
+    function formatOrderItemLabel(item) {
+      const quantity = Number(item?.quantity) || 1;
+      const catItem = item?.product_id ? productCatalog.get(String(item.product_id)) : null;
+
+      const cleanPrefix = String(item?.prefix_code || catItem?.prefix_code || "").replace(/[\.\:\-\s]+$/, "").trim();
+      const rawCode = String(item?.code || catItem?.code || "").replace(/^#+/, "").trim();
+      const rawName = String(item?.product_name || item?.name || catItem?.name || "").trim();
+
+      let codeLabel = "";
+      if (cleanPrefix && rawCode) {
+        if (rawCode.toLowerCase().startsWith(cleanPrefix.toLowerCase())) {
+          codeLabel = rawCode;
+        } else {
+          codeLabel = `${cleanPrefix} ${rawCode}`;
+        }
+      } else if (rawCode) {
+        codeLabel = rawCode;
+      } else if (cleanPrefix && rawName) {
+        if (rawName.toLowerCase().startsWith(cleanPrefix.toLowerCase())) {
+          codeLabel = rawName;
+        } else {
+          codeLabel = `${cleanPrefix} ${rawName}`;
+        }
+      } else if (rawName) {
+        codeLabel = rawName;
+      } else if (cleanPrefix) {
+        codeLabel = cleanPrefix;
+      } else {
+        codeLabel = "Món ăn";
+      }
+
+      return `${quantity} x ${codeLabel}`;
+    }
+
     function renderOrderItems(items) {
       if (!Array.isArray(items) || items.length === 0) return "";
 
       const rows = items.map(item => {
-        const quantity = Number(item?.quantity) || 1;
-        const rawCode = String(item?.code || "").replace(/^#+/, "").trim();
-        const rawName = String(item?.product_name || item?.name || "").trim();
+        const itemLabel = formatOrderItemLabel(item);
         const note = String(item?.note || "").trim();
-
-        let itemLabel = "";
-        if (rawCode) {
-          itemLabel = `${quantity} x ${rawCode}`;
-        } else {
-          itemLabel = `${quantity} x ${rawName || "Món ăn"}`;
-        }
 
         return `
           <div class="popup-item">
@@ -2209,6 +2302,7 @@
 
         const fullName = `${order.first_name ?? ""} ${order.last_name ?? ""}`.trim();
         const fullAddress = formatOrderAddress(order);
+        const isScheduled = isScheduledOrder(order);
         const orderTime = formatPopupOrderTime(order);
         const note = String(order.note || "").trim();
         const noteHtml = note
