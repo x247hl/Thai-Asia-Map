@@ -782,17 +782,17 @@
       map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
     }
 
-    L.tileLayer("https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+    function getGoogleMapTileUrl(withTraffic) {
+      const lyr = withTraffic ? "m,traffic" : "m";
+      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}`;
+    }
+
+    const isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
+
+    const baseTileLayer = L.tileLayer(getGoogleMapTileUrl(isTrafficEnabled), {
       maxZoom: 20,
       subdomains: ["mt0", "mt1", "mt2", "mt3"]
     }).addTo(map);
-
-    const trafficLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=traffic&x={x}&y={y}&z={z}", {
-      maxZoom: 20,
-      subdomains: ["mt0", "mt1", "mt2", "mt3"],
-      opacity: 0.95,
-      zIndex: 500
-    });
 
     const orderLayer = L.layerGroup().addTo(map);
     const shipperLayer = L.layerGroup().addTo(map);
@@ -1005,20 +1005,13 @@
       }
     });
 
-    const isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
     els.showTraffic.checked = isTrafficEnabled;
-    if (isTrafficEnabled) {
-      trafficLayer.addTo(map);
-    }
 
     els.showTraffic.addEventListener("change", () => {
-      if (els.showTraffic.checked) {
-        if (!map.hasLayer(trafficLayer)) trafficLayer.addTo(map);
-      } else if (map.hasLayer(trafficLayer)) {
-        map.removeLayer(trafficLayer);
-      }
+      const enabled = els.showTraffic.checked;
+      baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
       try {
-        localStorage.setItem("thaiasia.showTraffic", els.showTraffic.checked ? "1" : "0");
+        localStorage.setItem("thaiasia.showTraffic", enabled ? "1" : "0");
       } catch (err) {}
     });
 
