@@ -418,6 +418,61 @@
 
     .popup-line { margin: 2px 0; }
 
+    .order-popup {
+      max-width: 360px;
+      max-height: min(60vh, 520px);
+      overflow-y: auto;
+      padding-right: 4px;
+      box-sizing: border-box;
+    }
+
+    .popup-section-title {
+      font-weight: 700;
+      margin-top: 10px;
+      margin-bottom: 5px;
+    }
+
+    .popup-note {
+      background: #fffbe8;
+      border: 1px solid #f2dc73;
+      border-radius: 8px;
+      padding: 7px 8px;
+      line-height: 1.35;
+    }
+
+    .popup-items {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .popup-item {
+      background: #f6f7f9;
+      border-radius: 8px;
+      padding: 7px 8px;
+    }
+
+    .popup-item-main {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      font-weight: 700;
+    }
+
+    .popup-item-name {
+      min-width: 0;
+    }
+
+    .popup-item-price {
+      white-space: nowrap;
+    }
+
+    .popup-item-meta {
+      color: #475569;
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
     @media (min-width: 769px) {
       .top-panel {
         right: 20px;
@@ -808,6 +863,47 @@
       }).format(n);
     }
 
+    function escapeHtmlWithBreaks(value) {
+      return escapeHtml(value).replace(/\r?\n/g, "<br>");
+    }
+
+    function formatOrderItemTotal(item) {
+      const quantity = Number(item?.quantity);
+      const price = Number(item?.product_price);
+      if (!Number.isFinite(quantity) || !Number.isFinite(price)) return "";
+      return formatEuro(quantity * price);
+    }
+
+    function renderOrderItems(items) {
+      if (!Array.isArray(items) || items.length === 0) return "";
+
+      const rows = items.map(item => {
+        const codeText = item?.code ? `#${item.code} ` : "";
+        const name = `${codeText}${item?.product_name || "Món ăn"}`;
+        const quantity = item?.quantity ?? 0;
+        const unitPrice = formatEuro(item?.product_price);
+        const total = formatOrderItemTotal(item);
+
+        return `
+          <div class="popup-item">
+            <div class="popup-item-main">
+              <span class="popup-item-name">${escapeHtml(name)}</span>
+              ${total ? `<span class="popup-item-price">${escapeHtml(total)}</span>` : ""}
+            </div>
+            <div class="popup-item-meta">
+              Số lượng: ${escapeHtml(quantity)}${unitPrice ? ` x ${escapeHtml(unitPrice)}` : ""}
+            </div>
+            ${item?.note ? `<div class="popup-item-meta">Ghi chú: ${escapeHtml(item.note)}</div>` : ""}
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="popup-section-title">Thông tin món ăn</div>
+        <div class="popup-items">${rows}</div>
+      `;
+    }
+
     function renderOrders(orders) {
       orderLayer.clearLayers();
       const points = [];
@@ -844,20 +940,34 @@
           order.postcode,
           order.city
         ].filter(Boolean).join(", ");
+        const orderTime = String(order.time || "").trim();
+        const note = String(order.note || "").trim();
+        const noteHtml = note
+          ? `
+            <div class="popup-section-title">Ghi chú</div>
+            <div class="popup-note">${escapeHtmlWithBreaks(note)}</div>
+          `
+          : "";
 
         const popup = `
-          <div>
+          <div class="order-popup">
             <div class="popup-title">Đơn #${escapeHtml(code)}</div>
             <div class="popup-line"><b>${escapeHtml(orderStatusText(status, order.status_title))}</b></div>
             ${fullName ? `<div class="popup-line">${escapeHtml(fullName)}</div>` : ""}
             ${fullAddress ? `<div class="popup-line">${escapeHtml(fullAddress)}</div>` : ""}
             ${order.created_at ? `<div class="popup-line">Ngày tạo: ${escapeHtml(formatOrderDateTime(order.created_at))}</div>` : ""}
+            ${orderTime ? `<div class="popup-line">Thời gian: ${escapeHtml(orderTime)}</div>` : ""}
+            ${noteHtml}
+            ${renderOrderItems(order.items)}
             <div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>
           </div>
         `;
 
         L.marker([lat, lng], { icon })
-          .bindPopup(popup)
+          .bindPopup(popup, {
+            maxWidth: 380,
+            minWidth: 280
+          })
           .addTo(orderLayer);
 
         points.push([lat, lng]);
