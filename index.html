@@ -632,16 +632,11 @@
     <div class="field-label">Trạng thái đơn</div>
     <select id="statusFilter">
       <option value="all">Tất cả</option>
-      <option value="new">Đơn mới</option>
-      <option value="inprocess" selected>Tiếp nhận</option>
+      <option value="inprocess" selected>Tiếp nhận &amp; Mới</option>
+      <option value="new">Chỉ đơn mới</option>
       <option value="complete">Hoàn thành</option>
       <option value="cancel">Hủy</option>
     </select>
-
-    <label class="toggle-row">
-      <span>Chỉ hiện Giao hàng</span>
-      <input id="deliveryOnly" type="checkbox" checked />
-    </label>
 
     <label class="toggle-row">
       <span>Hiện đơn hàng</span>
@@ -753,7 +748,6 @@
       filterButton: document.getElementById("filterButton"),
       filterPanel: document.getElementById("filterPanel"),
       statusFilter: document.getElementById("statusFilter"),
-      deliveryOnly: document.getElementById("deliveryOnly"),
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
       reloadButton: document.getElementById("reloadButton"),
@@ -898,7 +892,6 @@
     });
 
     els.statusFilter.addEventListener("change", refreshAll);
-    els.deliveryOnly.addEventListener("change", refreshAll);
 
     els.showOrders.addEventListener("change", () => {
       if (els.showOrders.checked) {
@@ -998,6 +991,9 @@
       if (selected === "all") {
         // "Tất cả": gộp 4 trạng thái đã xác nhận từ API.
         statuses = ["new", "inprocess", "complete", "cancel"];
+      } else if (selected === "inprocess") {
+        // "Tiếp nhận & Mới": hiển thị và cập nhật cả đơn Mới và đơn Tiếp nhận
+        statuses = ["new", "inprocess"];
       } else {
         statuses = [selected];
       }
@@ -1013,9 +1009,8 @@
       orders.forEach(order => unique.set(order.id || order.code, order));
       orders = Array.from(unique.values());
 
-      if (els.deliveryOnly.checked) {
-        orders = orders.filter(order => order.shipping_method === "home_delivery");
-      }
+      // Mặc định trên bản đồ luôn chỉ hiện đơn giao hàng
+      orders = orders.filter(order => order.shipping_method === "home_delivery");
 
       renderOrders(orders);
       return orders;
