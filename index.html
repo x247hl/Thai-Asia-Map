@@ -1024,20 +1024,6 @@
       background: #bae6fd;
     }
 
-    .route-toggle-row {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      font-size: 12px;
-      color: #334155;
-      cursor: pointer;
-      padding: 2px 0;
-    }
-
-    .route-toggle-row input {
-      margin: 0;
-    }
-
     /* Route Summary Box */
     .route-summary-box {
       background: #fbfbfe;
@@ -1149,24 +1135,26 @@
     .route-top-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding-right: 26px;
+      justify-content: stretch;
+      gap: 8px;
+      padding-right: 34px;
       flex-wrap: nowrap;
     }
 
     .route-top-actions {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: center;
-      gap: 5px;
-      flex-shrink: 0;
+      gap: 8px;
+      width: 100%;
     }
 
     .route-mini-action-btn {
-      height: 27px;
-      padding: 0 8px;
+      width: 100%;
+      height: 32px;
+      padding: 0 10px;
       border-radius: 6px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
       border: 0;
       cursor: pointer;
@@ -1204,16 +1192,6 @@
       background: #ddd6fe;
     }
 
-    .route-mini-action-btn.secondary {
-      background: #e0e7ff;
-      color: #4338ca;
-      border: 1px solid #c7d2fe;
-    }
-
-    .route-mini-action-btn.secondary:not(:disabled):hover {
-      background: #c7d2fe;
-    }
-
     .route-mini-action-btn.danger {
       background: #fee2e2;
       color: #b91c1c;
@@ -1222,6 +1200,148 @@
 
     .route-mini-action-btn.danger:not(:disabled):hover {
       background: #fecaca;
+    }
+
+    /* Floating Route Suggestion Banner (Hàng 12 giờ) */
+    .route-suggestion-banner {
+      position: fixed;
+      top: calc(10px + env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1050;
+      background: linear-gradient(135deg, rgba(255, 237, 213, 0.98), rgba(255, 255, 255, 0.98));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 2px solid #f97316;
+      border-radius: 24px;
+      padding: 7px 14px;
+      box-shadow: 0 10px 30px rgba(249, 115, 22, 0.34), 0 3px 10px rgba(124, 45, 18, 0.14);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      max-width: min(calc(100vw - 140px), 420px);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: suggestionBannerSlide 0.25s ease-out;
+      user-select: none;
+    }
+
+    .route-suggestion-banner:hover {
+      transform: translateX(-50%) translateY(-1px);
+      box-shadow: 0 12px 34px rgba(249, 115, 22, 0.44), 0 4px 12px rgba(124, 45, 18, 0.18);
+      border-color: #ea580c;
+    }
+
+    .route-suggestion-banner.hidden {
+      display: none;
+    }
+
+    .route-suggestion-banner.optimal {
+      border-color: #16a34a;
+      background: linear-gradient(135deg, rgba(220, 252, 231, 0.98), rgba(255, 255, 255, 0.98));
+      box-shadow: 0 10px 28px rgba(22, 163, 74, 0.34), 0 3px 10px rgba(20, 83, 45, 0.14);
+      cursor: default;
+    }
+
+    @keyframes suggestionBannerSlide {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    .suggestion-icon {
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    .suggestion-content {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: #7c2d12;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .suggestion-label {
+      font-weight: 900;
+      color: #c2410c;
+    }
+
+    .route-suggestion-banner.optimal .suggestion-label {
+      color: #15803d;
+    }
+
+    .suggestion-path {
+      font-weight: 900;
+      color: #9a3412;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .route-suggestion-banner.optimal .suggestion-path {
+      color: #166534;
+    }
+
+    .suggestion-order-tag {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fdba74;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .route-suggestion-banner.optimal .suggestion-order-tag {
+      background: #f0fdf4;
+      color: #15803d;
+      border-color: #86efac;
+    }
+
+    .suggestion-arrow {
+      color: #ea580c;
+      font-size: 12px;
+      margin: 0 1px;
+    }
+
+    .route-suggestion-banner.optimal .suggestion-arrow {
+      color: #16a34a;
+    }
+
+    .suggestion-apply-btn {
+      height: 24px;
+      padding: 0 11px;
+      background: linear-gradient(135deg, #f97316, #dc2626);
+      color: #ffffff;
+      border: 0;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .suggestion-apply-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 3px 10px rgba(220, 38, 38, 0.38);
+    }
+
+    .suggestion-apply-btn:active {
+      transform: scale(0.95);
     }
 
     /* Floating Toast Feedback */
@@ -1307,51 +1427,18 @@
       transform: scale(1.15);
     }
 
-    /* Moving Directional Route Arrow along Polyline */
-    .route-arrow-marker {
-      pointer-events: none !important;
-      background: transparent !important;
-      border: none !important;
-    }
-
-    .route-moving-arrow-wrap {
-      width: 14px;
-      height: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .route-moving-arrow {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 14px;
-      height: 14px;
-      will-change: transform;
-      transform-origin: center center;
-      transition: transform 0.08s linear;
-    }
-
-    .route-moving-arrow svg {
-      display: block;
+    .route-moving-arrow-svg {
+      fill: #ffffff;
       filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 4px rgba(168, 85, 247, 0.9));
+      pointer-events: none;
+      will-change: transform;
     }
 
     /* Flowing Navigation Stream on Route Polyline */
     .route-flowing-line {
-      stroke-dasharray: 8, 14;
-      animation: routeStream 1.2s linear infinite;
+      stroke-dasharray: 10, 18;
+      stroke-dashoffset: 0;
       pointer-events: none !important;
-    }
-
-    @keyframes routeStream {
-      from {
-        stroke-dashoffset: 0;
-      }
-      to {
-        stroke-dashoffset: -22;
-      }
     }
 
     @media (min-width: 769px) {
@@ -1412,6 +1499,15 @@
     </div>
   </div>
 
+  <div id="routeSuggestionBanner" class="route-suggestion-banner hidden" onclick="applySuggestedRouteOrder()" title="Bấm để áp dụng gợi ý xếp đơn này">
+    <div class="suggestion-icon">💡</div>
+    <div class="suggestion-content">
+      <span id="suggestionLabel" class="suggestion-label">Gợi ý xếp đơn:</span>
+      <span id="suggestionPath" class="suggestion-path">—</span>
+    </div>
+    <button id="suggestionApplyBtn" class="suggestion-apply-btn" type="button" onclick="event.stopPropagation(); applySuggestedRouteOrder();">Áp dụng</button>
+  </div>
+
   <button id="routeButton" class="route-button" type="button" title="Lộ trình giao hàng chuỗi" aria-label="Lộ trình">
     <span>🛣️</span>
     <span id="routeBadge" class="route-badge hidden">0</span>
@@ -1422,14 +1518,8 @@
 
     <div class="route-body">
       <div class="route-top-row">
-        <label class="route-toggle-row">
-          <input id="routeReturnToShop" type="checkbox" />
-          <span>Quay về Quán</span>
-        </label>
-
         <div class="route-top-actions">
           <button id="routeOptimizeBtn" class="route-mini-action-btn optimize" type="button" title="Gợi ý & tự động tối ưu thứ tự giao" disabled>✨ Tối ưu</button>
-          <button id="routeReverseBtn" class="route-mini-action-btn secondary" type="button" title="Đảo ngược thứ tự giao đơn" disabled>⇄ Đảo</button>
           <button id="routeFitViewBtn" class="route-mini-action-btn primary" type="button" title="Xem toàn cảnh lộ trình" disabled>🔍 Toàn cảnh</button>
           <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình" disabled>🗑️ Xóa</button>
         </div>
@@ -1505,7 +1595,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v49</span>
+      <span style="font-weight: 700; color: #7c3aed;">v54</span>
     </div>
   </div>
 
@@ -1531,7 +1621,7 @@
     const DEFAULT_ZOOM_ANDROID = 12;
     const DEFAULT_ZOOM_IPHONE = 11;
     const SHIPPER_FOCUS_ZOOM = 15;
-    const ORDER_FOCUS_ZOOM = 15;
+    const ORDER_FOCUS_ZOOM = 12;
 
     function getDefaultZoom() {
       const platform = navigator.userAgent || navigator.platform || "";
@@ -1621,16 +1711,16 @@
     const shipperLayer = L.layerGroup().addTo(map);
     const routeLayerGroup = L.layerGroup().addTo(map);
 
-    const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
     let routeOrderKeys = [];
     let isRoutingArmed = false;
     let lastInteractedOrderKey = null;
     let routeStartType = null;
-    let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
+    let routeReturnToShop = false;
     let routePolylineOutline = null;
     let routePolylineInner = null;
     let routeAnimationId = null;
     let movingArrowMarkers = [];
+    let routeDrawRequestId = 0;
 
     let openedOrderKey = null;
     let isRefreshingOrders = false;
@@ -1653,6 +1743,7 @@
 
     restaurantMarker.on("click", () => {
       routeStartType = "restaurant";
+      routeReturnToShop = false;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
       if (routeOrderKeys.length > 0) {
@@ -1684,15 +1775,17 @@
       routeBadge: document.getElementById("routeBadge"),
       routePanel: document.getElementById("routePanel"),
       routeCloseButton: document.getElementById("routeCloseButton"),
-      routeReturnToShop: document.getElementById("routeReturnToShop"),
       routeSummaryBox: document.getElementById("routeSummaryBox"),
       routeTotalDist: document.getElementById("routeTotalDist"),
       routeTotalTime: document.getElementById("routeTotalTime"),
       routeLegsList: document.getElementById("routeLegsList"),
       routeOptimizeBtn: document.getElementById("routeOptimizeBtn"),
-      routeReverseBtn: document.getElementById("routeReverseBtn"),
       routeFitViewBtn: document.getElementById("routeFitViewBtn"),
       routeClearBtn: document.getElementById("routeClearBtn"),
+      routeSuggestionBanner: document.getElementById("routeSuggestionBanner"),
+      suggestionLabel: document.getElementById("suggestionLabel"),
+      suggestionPath: document.getElementById("suggestionPath"),
+      suggestionApplyBtn: document.getElementById("suggestionApplyBtn"),
       mapToast: document.getElementById("mapToast"),
       statusFilter: document.getElementById("statusFilter"),
       showOrders: document.getElementById("showOrders"),
@@ -1909,19 +2002,6 @@
       });
     }
 
-    if (els.routeReturnToShop) {
-      els.routeReturnToShop.checked = routeReturnToShop;
-      els.routeReturnToShop.addEventListener("change", () => {
-        routeReturnToShop = els.routeReturnToShop.checked;
-        try {
-          localStorage.setItem(ROUTE_RETURN_TO_SHOP_KEY, routeReturnToShop ? "1" : "0");
-        } catch (err) { }
-        if (typeof calculateAndDrawRoute === "function") {
-          calculateAndDrawRoute();
-        }
-      });
-    }
-
     if (els.routeOptimizeBtn) {
       els.routeOptimizeBtn.addEventListener("click", () => {
         if (typeof optimizeRouteOrders === "function") {
@@ -1930,18 +2010,10 @@
       });
     }
 
-    if (els.routeReverseBtn) {
-      els.routeReverseBtn.addEventListener("click", () => {
-        if (typeof reverseRouteOrders === "function") {
-          reverseRouteOrders();
-        }
-      });
-    }
-
     if (els.routeFitViewBtn) {
-      els.routeFitViewBtn.addEventListener("click", () => {
+      els.routeFitViewBtn.addEventListener("click", async () => {
         if (typeof fitRouteView === "function") {
-          fitRouteView();
+          await fitRouteView();
         }
       });
     }
@@ -2111,18 +2183,22 @@
       return status || "Không rõ";
     }
 
-    function isScheduledInprocessOrder(order) {
+    function isScheduledOrder(order) {
       const time = String(order?.time || "").trim().toLowerCase();
-      return order?.status === "inprocess" && time !== "" && !time.includes("schnell");
+      return time !== "" && !time.includes("schnell") && !time.includes("asap") && !time.includes("ngay") && !time.includes("mög");
+    }
+
+    function isScheduledInprocessOrder(order) {
+      return (order?.status === "inprocess" || order?.status === "new") && isScheduledOrder(order);
     }
 
     function orderClass(order) {
       const status = order?.status ?? "";
 
-      if (status === "new") return "order-new";
-      if (status === "complete") return "order-complete";
       if (status === "cancel") return "order-cancel";
+      if (status === "complete") return "order-complete";
       if (isScheduledInprocessOrder(order)) return "order-inprocess-scheduled";
+      if (status === "new") return "order-new";
       return "order-inprocess";
     }
 
@@ -2137,6 +2213,64 @@
         minute: "2-digit",
         hour12: false
       }).format(d);
+    }
+
+    function getDisplayOrderTime(order) {
+      if (!order) return "";
+      const rawTime = String(order.time || "").trim();
+      const lower = rawTime.toLowerCase();
+      const additionalMin = Number(order.additional_time) || 0;
+
+      // Trường hợp 1: Có giờ hẹn cụ thể (không phải schnell wie möglich / asap / ngay)
+      if (rawTime && !lower.includes("schnell") && !lower.includes("asap") && !lower.includes("ngay") && !lower.includes("mög")) {
+        const match = rawTime.match(/(\d{1,2}):(\d{2})/);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          let m = parseInt(match[2], 10);
+          if (!Number.isNaN(h) && !Number.isNaN(m)) {
+            if (additionalMin > 0) {
+              const totalMins = h * 60 + m + additionalMin;
+              h = Math.floor(totalMins / 60) % 24;
+              m = totalMins % 60;
+            }
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          }
+        }
+        return rawTime;
+      }
+
+      // Trường hợp 2: Đơn thường (schnell wie möglich)
+      if (order.created_at) {
+        const d = new Date(order.created_at);
+        if (!Number.isNaN(d.getTime())) {
+          if (additionalMin > 0) {
+            d.setMinutes(d.getMinutes() + additionalMin);
+          }
+          return new Intl.DateTimeFormat("vi-VN", {
+            timeZone: "Europe/Berlin",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false
+          }).format(d);
+        }
+      }
+
+      return formatOrderTime(order.created_at);
+    }
+
+    function formatPopupOrderTime(order) {
+      if (!order) return "";
+      const rawTime = String(order.time || "").trim();
+      const additionalMin = Number(order.additional_time) || 0;
+      const displayTime = getDisplayOrderTime(order);
+
+      if (additionalMin > 0) {
+        if (rawTime && !rawTime.toLowerCase().includes("schnell")) {
+          return `${displayTime} (${rawTime} + ${additionalMin}p)`;
+        }
+        return `${displayTime} (+${additionalMin}p)`;
+      }
+      return rawTime || displayTime;
     }
 
     function formatOrderAddress(order) {
@@ -2261,12 +2395,10 @@
         const lng = toNumber(order.longitude);
         if (lat === null || lng === null) return;
 
-        const time = formatOrderTime(order.created_at);
+        const time = getDisplayOrderTime(order);
         const code = order.code ?? "?";
         const status = order.status ?? "";
         const orderKey = getOrderKey(order);
-        const isInRoute = routeOrderKeys.includes(orderKey);
-        const routeBtnText = isInRoute ? "➖ Bỏ khỏi lộ trình" : "➕ Thêm vào lộ trình";
 
         const icon = L.divIcon({
           className: "",
@@ -2286,7 +2418,7 @@
 
         const fullName = `${order.first_name ?? ""} ${order.last_name ?? ""}`.trim();
         const fullAddress = formatOrderAddress(order);
-        const orderTime = String(order.time || "").trim();
+        const orderTime = formatPopupOrderTime(order);
         const note = String(order.note || "").trim();
         const noteHtml = note
           ? `
@@ -2390,7 +2522,7 @@
         points.push([lat, lng]);
       });
 
-      if (markerToReopen) {
+      if (openedOrderKey && markerToReopen) {
         markerToReopen.openPopup();
       }
       isRefreshingOrders = false;
@@ -2416,9 +2548,6 @@
       if (els.routeOptimizeBtn) {
         els.routeOptimizeBtn.disabled = count < 2;
       }
-      if (els.routeReverseBtn) {
-        els.routeReverseBtn.disabled = count < 2;
-      }
       if (els.routeFitViewBtn) {
         els.routeFitViewBtn.disabled = count === 0;
       }
@@ -2443,9 +2572,7 @@
     function renderRoutePanelUi() {
       updateRouteBadge();
 
-      if (els.routeReturnToShop) {
-        els.routeReturnToShop.checked = routeReturnToShop;
-      }
+      updateRouteSuggestionBanner();
     }
 
     let toastTimer = null;
@@ -2462,6 +2589,7 @@
     function parseOrderSchedule(order) {
       if (!order) return { isScheduled: false, targetMinutesFromNow: 0 };
       const rawTime = String(order.time || "").trim().toLowerCase();
+      const additionalMin = Number(order.additional_time) || 0;
       if (!rawTime || rawTime.includes("schnell") || rawTime.includes("asap") || rawTime.includes("ngay") || rawTime.includes("mög")) {
         return { isScheduled: false, targetMinutesFromNow: 0 };
       }
@@ -2478,6 +2606,9 @@
       const now = new Date();
       const target = new Date(now);
       target.setHours(h, m, 0, 0);
+      if (additionalMin > 0) {
+        target.setMinutes(target.getMinutes() + additionalMin);
+      }
 
       let diffMin = (target.getTime() - now.getTime()) / 60000;
       if (diffMin < -600) {
@@ -2529,8 +2660,10 @@
 
       let currentLat = startLat;
       let currentLng = startLng;
+
+      // Bước 1: Tính toán thời gian di chuyển từng chặng
       let totalTravelMin = 0;
-      let totalPenalty = 0;
+      const orderMetaList = [];
 
       for (let i = 0; i < perm.length; i++) {
         const key = perm[i];
@@ -2545,30 +2678,88 @@
         const legTravelMin = (straightDistMeters * 1.35) / 500;
         totalTravelMin += legTravelMin;
 
-        const arrivalFromNow = totalTravelMin + i * 2.5;
+        const tripTime = totalTravelMin + i * 2.5;
 
         const schedule = parseOrderSchedule(order);
-        if (schedule.isScheduled) {
-          const targetMin = schedule.targetMinutesFromNow;
+        const waitMin = getOrderWaitTimeMinutes(order);
+
+        orderMetaList.push({
+          order,
+          schedule,
+          waitMin,
+          tripTime
+        });
+
+        currentLat = oLat;
+        currentLng = oLng;
+      }
+
+      // Bước 2: Backward Scheduling - Tự động tính độ lùi thời gian xuất phát lý tưởng
+      let maxAllowedD = Infinity;
+      let idealD = Infinity;
+      let hasScheduled = false;
+
+      for (let i = 0; i < orderMetaList.length; i++) {
+        const item = orderMetaList[i];
+        if (item.schedule.isScheduled) {
+          hasScheduled = true;
+          const targetArrival = item.schedule.targetMinutesFromNow;
+          const neededD = targetArrival - item.tripTime;
+          if (neededD < idealD) {
+            idealD = neededD;
+          }
+        } else {
+          // Đơn thường: khống chế không để khách chờ quá 35 phút
+          const limitD = Math.max(0, 35 - item.waitMin - item.tripTime);
+          if (limitD < maxAllowedD) {
+            maxAllowedD = limitD;
+          }
+        }
+      }
+
+      let departureOffset = 0;
+      if (hasScheduled) {
+        departureOffset = Math.max(0, Math.min(idealD, maxAllowedD));
+        if (!Number.isFinite(departureOffset)) departureOffset = 0;
+      }
+
+      // Bước 3: Chấm điểm phạt độ trễ và độ sớm từ mốc xuất phát lý tưởng
+      let totalPenalty = 0;
+      const scheduledStops = [];
+
+      for (let i = 0; i < orderMetaList.length; i++) {
+        const item = orderMetaList[i];
+        const arrivalFromNow = departureOffset + item.tripTime;
+
+        if (item.schedule.isScheduled) {
+          const targetMin = item.schedule.targetMinutesFromNow;
           if (arrivalFromNow < targetMin) {
-            totalPenalty += (targetMin - arrivalFromNow) * 0.4;
+            totalPenalty += (targetMin - arrivalFromNow) * 0.2;
           } else if (arrivalFromNow <= targetMin + 15) {
             totalPenalty += 0;
           } else {
             const lateMin = arrivalFromNow - (targetMin + 15);
-            totalPenalty += Math.pow(lateMin, 2) * 4;
+            totalPenalty += Math.pow(lateMin, 2) * 5;
           }
+          scheduledStops.push({ index: i, targetMin });
         } else {
-          const minsWaiting = getOrderWaitTimeMinutes(order);
-          const totalWaitAtDelivery = minsWaiting + arrivalFromNow;
-
+          const totalWaitAtDelivery = item.waitMin + arrivalFromNow;
           if (totalWaitAtDelivery > 28) {
             totalPenalty += Math.pow(totalWaitAtDelivery - 28, 1.6) * 1.6;
           }
         }
+      }
 
-        currentLat = oLat;
-        currentLng = oLng;
+      // Phạt nặng nghịch đảo thứ tự giờ hẹn (Đơn hẹn sớm hơn bắt buộc phải đi trước)
+      for (let j = 0; j < scheduledStops.length; j++) {
+        for (let k = j + 1; k < scheduledStops.length; k++) {
+          const earlierStop = scheduledStops[j];
+          const laterStop = scheduledStops[k];
+          if (earlierStop.targetMin > laterStop.targetMin + 5) {
+            const diff = earlierStop.targetMin - laterStop.targetMin;
+            totalPenalty += diff * 20;
+          }
+        }
       }
 
       if (routeReturnToShop) {
@@ -2579,11 +2770,10 @@
       return (totalTravelMin * 1.25) + totalPenalty;
     }
 
-    window.optimizeRouteOrders = function () {
-      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
-
-      const perms = getPermutations(routeOrderKeys);
-      let bestPerm = routeOrderKeys;
+    function getOptimalRoutePermutation(keys) {
+      if (!Array.isArray(keys) || keys.length < 2) return keys ? [...keys] : [];
+      const perms = getPermutations(keys);
+      let bestPerm = keys;
       let minCost = Infinity;
 
       for (let i = 0; i < perms.length; i++) {
@@ -2593,7 +2783,68 @@
           bestPerm = perms[i];
         }
       }
+      return bestPerm;
+    }
 
+    function updateRouteSuggestionBanner() {
+      if (!els.routeSuggestionBanner || !els.suggestionLabel || !els.suggestionPath) return;
+
+      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) {
+        els.routeSuggestionBanner.classList.add("hidden");
+        return;
+      }
+
+      const bestPerm = getOptimalRoutePermutation(routeOrderKeys);
+      if (!bestPerm || bestPerm.length < 2) {
+        els.routeSuggestionBanner.classList.add("hidden");
+        return;
+      }
+
+      const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
+
+      const pathHtml = bestPerm.map(k => {
+        const order = lastOrders.find(o => getOrderKey(o) === k);
+        const code = order?.code || order?.id || "?";
+        return `<span class="suggestion-order-tag">#${escapeHtml(code)}</span>`;
+      }).join(' <span class="suggestion-arrow">➔</span> ');
+
+      els.suggestionPath.innerHTML = pathHtml;
+
+      if (isSame) {
+        els.suggestionLabel.textContent = "✅ Lộ Trình Tốt Nhất:";
+        els.routeSuggestionBanner.classList.add("optimal");
+        if (els.suggestionApplyBtn) els.suggestionApplyBtn.style.display = "none";
+      } else {
+        els.suggestionLabel.textContent = "Gợi ý xếp đơn:";
+        els.routeSuggestionBanner.classList.remove("optimal");
+        if (els.suggestionApplyBtn) els.suggestionApplyBtn.style.display = "inline-flex";
+      }
+
+      els.routeSuggestionBanner.classList.remove("hidden");
+    }
+
+    window.applySuggestedRouteOrder = function () {
+      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
+      const bestPerm = getOptimalRoutePermutation(routeOrderKeys);
+      const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
+      routeOrderKeys = bestPerm;
+      routeStartType = "restaurant";
+      routeReturnToShop = true;
+      isRoutingArmed = true;
+      lastInteractedOrderKey = null;
+      renderRoutePanelUi();
+      calculateAndDrawRoute();
+      if (isSame) {
+        showToast("Đã nối Quán ở đầu và cuối lộ trình!");
+        return;
+      }
+      showToast("✨ Đã áp dụng gợi ý và nối Quán đầu/cuối!");
+    };
+
+    window.optimizeRouteOrders = function () {
+      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
+
+      const bestPerm = getOptimalRoutePermutation(routeOrderKeys);
       const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
       if (isSame) {
         showToast("Lộ trình hiện tại đã tối ưu nhất! 👍");
@@ -2620,6 +2871,8 @@
         if (routeOrderKeys.length === 0) {
           isRoutingArmed = false;
           lastInteractedOrderKey = null;
+          routeStartType = null;
+          routeReturnToShop = false;
         }
       } else {
         routeOrderKeys.push(orderKey);
@@ -2652,6 +2905,8 @@
         if (routeOrderKeys.length === 0) {
           isRoutingArmed = false;
           lastInteractedOrderKey = null;
+          routeStartType = null;
+          routeReturnToShop = false;
         }
         renderRoutePanelUi();
         calculateAndDrawRoute();
@@ -2667,6 +2922,11 @@
         cancelAnimationFrame(routeAnimationId);
         routeAnimationId = null;
       }
+      movingArrowMarkers.forEach(item => {
+        if (item?.arrowEl?.parentNode) {
+          item.arrowEl.parentNode.removeChild(item.arrowEl);
+        }
+      });
       movingArrowMarkers = [];
     }
 
@@ -2703,8 +2963,10 @@
 
     function clearRoute() {
       stopRouteAnimation();
+      routeDrawRequestId++;
       routeOrderKeys = [];
       routeStartType = null;
+      routeReturnToShop = false;
       isRoutingArmed = false;
       lastInteractedOrderKey = null;
       routeLayerGroup.clearLayers();
@@ -2719,7 +2981,15 @@
       });
     }
 
-    function fitRouteView() {
+    async function fitRouteView() {
+      if (!routeStartType && routeOrderKeys.length >= 2) {
+        routeStartType = "restaurant";
+        routeReturnToShop = true;
+        isRoutingArmed = true;
+        renderRoutePanelUi();
+        await calculateAndDrawRoute();
+      }
+
       if (routePolylineOutline) {
         map.fitBounds(routePolylineOutline.getBounds(), {
           padding: [60, 60],
@@ -2729,13 +2999,15 @@
     }
 
     async function calculateAndDrawRoute() {
+      const requestId = ++routeDrawRequestId;
+
       if (!routeOrderKeys.length) {
         stopRouteAnimation();
         routeLayerGroup.clearLayers();
         routePolylineOutline = null;
         routePolylineInner = null;
         if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
-        return;
+        return false;
       }
 
       const waypoints = [];
@@ -2781,7 +3053,7 @@
         routePolylineOutline = null;
         routePolylineInner = null;
         if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
-        return;
+        return false;
       }
 
       try {
@@ -2791,6 +3063,10 @@
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+
+        if (requestId !== routeDrawRequestId) {
+          return false;
+        }
 
         if (!data || data.code !== "Ok" || !Array.isArray(data.routes) || !data.routes.length) {
           throw new Error("Không tìm thấy lộ trình");
@@ -2819,7 +3095,7 @@
         }).addTo(routeLayerGroup);
 
         // Animated Flowing Navigation Stream along Route
-        L.polyline(latLngs, {
+        const routeFlowLine = L.polyline(latLngs, {
           color: "#ffffff",
           weight: 2.2,
           opacity: 0.85,
@@ -2837,70 +3113,60 @@
         }
         const totalRouteDist = cumDist[cumDist.length - 1];
 
-        // Animate moving directional arrows along polyline
-        if (totalRouteDist >= 50 && latLngs.length >= 2) {
-          const ARROW_SPACING = Math.max(200, Math.min(380, totalRouteDist / 8));
-          const numArrows = Math.max(2, Math.min(18, Math.round(totalRouteDist / ARROW_SPACING)));
-          const stepDist = totalRouteDist / numArrows;
+        // Animate arrows directly on the route SVG path to avoid Leaflet marker jitter.
+        const flowPath = routeFlowLine?._path;
+        if (totalRouteDist >= 50 && flowPath && typeof flowPath.getTotalLength === "function") {
+          const pathLengthPx = flowPath.getTotalLength();
+          const arrowParent = flowPath.parentNode;
 
-          for (let k = 0; k < numArrows; k++) {
-            const initialDist = (k * stepDist) % totalRouteDist;
-            const pt = getRoutePointAtDistance(latLngs, cumDist, totalRouteDist, initialDist);
+          if (pathLengthPx > 0 && arrowParent) {
+            const SVG_NS = "http://www.w3.org/2000/svg";
+            const numArrows = Math.max(2, Math.min(10, Math.round(pathLengthPx / 150)));
+            const stepPx = pathLengthPx / numArrows;
 
-            const wrapEl = document.createElement("div");
-            wrapEl.className = "route-moving-arrow-wrap";
-            wrapEl.innerHTML = `
-              <div class="route-moving-arrow" style="transform: rotate(${Math.round(pt.bearing)}deg);">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff">
-                  <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
-                </svg>
-              </div>
-            `;
+            for (let k = 0; k < numArrows; k++) {
+              const arrowEl = document.createElementNS(SVG_NS, "path");
+              arrowEl.setAttribute("class", "route-moving-arrow-svg");
+              arrowEl.setAttribute("d", "M 0 -8 L 6 7 L 0 4 L -6 7 Z");
+              arrowParent.appendChild(arrowEl);
 
-            const arrowMarker = L.marker([pt.lat, pt.lng], {
-              icon: L.divIcon({
-                className: "route-arrow-marker",
-                html: wrapEl,
-                iconSize: [14, 14],
-                iconAnchor: [7, 7]
-              }),
-              zIndexOffset: 2600,
-              interactive: false
-            }).addTo(routeLayerGroup);
-
-            movingArrowMarkers.push({
-              marker: arrowMarker,
-              arrowEl: wrapEl.querySelector(".route-moving-arrow"),
-              currentDist: initialDist,
-              lastBearing: pt.bearing
-            });
-          }
-
-          // Start continuous animation loop
-          const SPEED_MPS = 42; // speed: ~42 m/s (smooth flowing visual speed)
-          let lastTimestamp = performance.now();
-
-          const animateRoute = (timestamp) => {
-            const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
-            lastTimestamp = timestamp;
-
-            const moveDelta = SPEED_MPS * dt;
-            for (let i = 0; i < movingArrowMarkers.length; i++) {
-              const item = movingArrowMarkers[i];
-              item.currentDist = (item.currentDist + moveDelta) % totalRouteDist;
-              const pt = getRoutePointAtDistance(latLngs, cumDist, totalRouteDist, item.currentDist);
-
-              item.marker.setLatLng([pt.lat, pt.lng]);
-              if (Math.abs(pt.bearing - item.lastBearing) > 1.2) {
-                item.arrowEl.style.transform = `rotate(${Math.round(pt.bearing)}deg)`;
-                item.lastBearing = pt.bearing;
-              }
+              movingArrowMarkers.push({
+                arrowEl,
+                offsetPx: k * stepPx
+              });
             }
 
-            routeAnimationId = requestAnimationFrame(animateRoute);
-          };
+            const SPEED_PX_PER_SEC = 75;
+            const FLOW_DASH_PATTERN_PX = 28;
+            const animationStart = performance.now();
 
-          routeAnimationId = requestAnimationFrame(animateRoute);
+            const getAngleAtPathPx = (path, distancePx) => {
+              const d1 = Math.max(0, distancePx - 2);
+              const d2 = Math.min(pathLengthPx, distancePx + 2);
+              const p1 = path.getPointAtLength(d1);
+              const p2 = path.getPointAtLength(d2 === d1 ? Math.min(pathLengthPx, d1 + 1) : d2);
+              return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI + 90;
+            };
+
+            const animateRoute = (timestamp) => {
+              const elapsedSec = (timestamp - animationStart) / 1000;
+              const travelPx = (elapsedSec * SPEED_PX_PER_SEC) % pathLengthPx;
+              const dashOffsetPx = -(elapsedSec * SPEED_PX_PER_SEC) % FLOW_DASH_PATTERN_PX;
+              flowPath.style.strokeDashoffset = `${dashOffsetPx}px`;
+
+              for (let i = 0; i < movingArrowMarkers.length; i++) {
+                const item = movingArrowMarkers[i];
+                const distancePx = (item.offsetPx + travelPx) % pathLengthPx;
+                const p = flowPath.getPointAtLength(distancePx);
+                const angle = getAngleAtPathPx(flowPath, distancePx);
+                item.arrowEl.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(1)})`);
+              }
+
+              routeAnimationId = requestAnimationFrame(animateRoute);
+            };
+
+            routeAnimationId = requestAnimationFrame(animateRoute);
+          }
         }
 
         // Add 3D High-Contrast Neon numbered waypoint badges on map (Phương án 5)
@@ -2969,8 +3235,10 @@
         }
 
         if (els.routeSummaryBox) els.routeSummaryBox.classList.remove("hidden");
+        return true;
       } catch (err) {
         console.warn("Lỗi tính lộ trình:", err);
+        return false;
       }
     }
 
@@ -3067,6 +3335,7 @@
 
       // Đặt shipper này làm điểm xuất phát cho lộ trình
       routeStartType = `shipper:${key}`;
+      routeReturnToShop = false;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
       if (routeOrderKeys.length > 0) {
@@ -3479,6 +3748,7 @@
         marker.on("click", () => {
           const key = getShipperKey(shipper);
           routeStartType = `shipper:${key}`;
+          routeReturnToShop = false;
           isRoutingArmed = true;
           lastInteractedOrderKey = null;
           if (routeOrderKeys.length > 0) {
