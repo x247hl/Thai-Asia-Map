@@ -588,11 +588,62 @@
     }
 
     .order-popup {
-      max-width: 360px;
-      max-height: min(60vh, 520px);
+      width: 100%;
+      max-width: min(390px, calc(100vw - 36px));
+      max-height: min(74vh, calc(100vh - 160px));
       overflow-y: auto;
       padding-right: 4px;
       box-sizing: border-box;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .order-popup::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .order-popup::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .order-popup::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.22);
+      border-radius: 4px;
+    }
+
+    .order-popup::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.38);
+    }
+
+    .leaflet-popup-content-wrapper {
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .24);
+    }
+
+    .leaflet-popup-content {
+      margin: 14px 14px 12px 14px;
+      line-height: 1.4;
+    }
+
+    .leaflet-container a.leaflet-popup-close-button {
+      top: 8px;
+      right: 8px;
+      padding: 4px;
+      color: #888;
+      font-size: 18px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border-radius: 50%;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .leaflet-container a.leaflet-popup-close-button:hover,
+    .leaflet-container a.leaflet-popup-close-button:active {
+      background: #eee;
+      color: #222;
     }
 
     .popup-section-title {
@@ -763,6 +814,7 @@
     const DEFAULT_ZOOM_ANDROID = 12;
     const DEFAULT_ZOOM_IPHONE = 11;
     const SHIPPER_FOCUS_ZOOM = 15;
+    const ORDER_FOCUS_ZOOM = 15;
 
     function getDefaultZoom() {
       const platform = navigator.userAgent || navigator.platform || "";
@@ -1237,13 +1289,34 @@
     }
 
     let openedOrderKey = null;
+    let isRefreshingOrders = false;
+
+    function focusOrderMarker(lat, lng, zoom = ORDER_FOCUS_ZOOM) {
+      if (lat === null || lng === null) return;
+      const targetZoom = zoom || map.getZoom();
+      const containerHeight = map.getSize().y;
+
+      // Đặt vị trí marker nằm trên nút reload khoảng 85px - 100px từ mép dưới màn hình
+      const bottomPadding = Math.min(100, Math.max(75, containerHeight * 0.14));
+      const offsetY = (containerHeight / 2) - bottomPadding;
+
+      const point = map.project([lat, lng], targetZoom);
+      const newCenterPoint = new L.Point(point.x, point.y - offsetY);
+      const newCenterLatLng = map.unproject(newCenterPoint, targetZoom);
+
+      map.setView(newCenterLatLng, targetZoom, { animate: true });
+    }
 
     function getOrderKey(order) {
       return String(order?.id || order?.code || `${order?.latitude}_${order?.longitude}`);
     }
 
     function renderOrders(orders) {
+      isRefreshingOrders = true;
+      const prevOpenedKey = openedOrderKey;
       orderLayer.clearLayers();
+      openedOrderKey = prevOpenedKey;
+
       const points = [];
       let markerToReopen = null;
 
@@ -1305,18 +1378,23 @@
 
         const marker = L.marker([lat, lng], { icon })
           .bindPopup(popup, {
-            maxWidth: 380,
+            maxWidth: 400,
             minWidth: 280,
             autoPan: false
           })
           .addTo(orderLayer);
+
+        marker.on("click", () => {
+          stopFollowShipper();
+          focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
+        });
 
         marker.on("popupopen", () => {
           openedOrderKey = orderKey;
         });
 
         marker.on("popupclose", () => {
-          if (openedOrderKey === orderKey) {
+          if (!isRefreshingOrders && openedOrderKey === orderKey) {
             openedOrderKey = null;
           }
         });
@@ -1331,6 +1409,7 @@
       if (markerToReopen) {
         markerToReopen.openPopup();
       }
+      isRefreshingOrders = false;
 
       els.orderCount.textContent = String(orders.length);
       els.orderSummary.classList.toggle("has-orders", orders.length >= 1);
