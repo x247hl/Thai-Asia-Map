@@ -1188,44 +1188,35 @@
       transform: scale(1.15);
     }
 
-    /* Directional Route Arrow along Polyline */
+    /* Moving Directional Route Arrow along Polyline */
     .route-arrow-marker {
       pointer-events: none !important;
       background: transparent !important;
       border: none !important;
     }
 
-    .route-arrow-wrap {
+    .route-moving-arrow-wrap {
       width: 14px;
       height: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      transform-origin: center center;
     }
 
-    .route-arrow-pulse {
+    .route-moving-arrow {
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: arrowPulse 1.4s ease-in-out infinite alternate;
+      width: 14px;
+      height: 14px;
+      will-change: transform;
       transform-origin: center center;
+      transition: transform 0.08s linear;
     }
 
-    .route-arrow-pulse svg {
+    .route-moving-arrow svg {
       display: block;
-      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.85));
-    }
-
-    @keyframes arrowPulse {
-      0% {
-        transform: scale(0.85);
-        opacity: 0.7;
-      }
-      100% {
-        transform: scale(1.2);
-        opacity: 1;
-      }
+      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 4px rgba(168, 85, 247, 0.9));
     }
 
     /* Flowing Navigation Stream on Route Polyline */
@@ -1468,6 +1459,8 @@
     let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
     let routePolylineOutline = null;
     let routePolylineInner = null;
+    let routeAnimationId = null;
+    let movingArrowMarkers = [];
 
     let openedOrderKey = null;
     let isRefreshingOrders = false;
@@ -2300,7 +2293,47 @@
       }
     };
 
+    function stopRouteAnimation() {
+      if (routeAnimationId) {
+        cancelAnimationFrame(routeAnimationId);
+        routeAnimationId = null;
+      }
+      movingArrowMarkers = [];
+    }
+
+    function getRoutePointAtDistance(latLngs, cumDist, totalDist, targetDist) {
+      if (!totalDist || totalDist <= 0 || !latLngs || latLngs.length < 2) {
+        return { lat: 0, lng: 0, bearing: 0 };
+      }
+      const d = ((targetDist % totalDist) + totalDist) % totalDist;
+
+      let low = 0;
+      let high = cumDist.length - 2;
+      let idx = 0;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (cumDist[mid] <= d) {
+          idx = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      const segLen = cumDist[idx + 1] - cumDist[idx];
+      const t = segLen > 0 ? (d - cumDist[idx]) / segLen : 0;
+      const p1 = latLngs[idx];
+      const p2 = latLngs[idx + 1];
+
+      const lat = p1[0] + t * (p2[0] - p1[0]);
+      const lng = p1[1] + t * (p2[1] - p1[1]);
+      const bearing = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
+
+      return { lat, lng, bearing };
+    }
+
     function clearRoute() {
+      stopRouteAnimation();
       routeOrderKeys = [];
       routeStartType = null;
       isRoutingArmed = false;
@@ -2328,6 +2361,7 @@
 
     async function calculateAndDrawRoute() {
       if (!routeOrderKeys.length) {
+        stopRouteAnimation();
         routeLayerGroup.clearLayers();
         routePolylineOutline = null;
         routePolylineInner = null;
@@ -2373,6 +2407,7 @@
       }
 
       if (waypoints.length < 2) {
+        stopRouteAnimation();
         routeLayerGroup.clearLayers();
         routePolylineOutline = null;
         routePolylineInner = null;
@@ -2392,6 +2427,7 @@
           throw new Error("Không tìm thấy lộ trình");
         }
 
+        stopRouteAnimation();
         const route = data.routes[0];
         routeLayerGroup.clearLayers();
 
@@ -2424,43 +2460,78 @@
           interactive: false
         }).addTo(routeLayerGroup);
 
-        // Add Animated Directional Arrows along the polyline route
-        let accumulatedDist = 0;
-        const ARROW_INTERVAL_METERS = 380; // Mỗi ~380m đặt 1 mũi tên chỉ hướng
-
+        // Precompute cumulative distances along route polyline
+        const cumDist = [0];
         for (let i = 0; i < latLngs.length - 1; i++) {
-          const p1 = latLngs[i];
-          const p2 = latLngs[i + 1];
-          const segDist = calculateDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
-          accumulatedDist += segDist;
+          const d = calculateDistanceMeters(latLngs[i][0], latLngs[i][1], latLngs[i + 1][0], latLngs[i + 1][1]);
+          cumDist.push(cumDist[i] + d);
+        }
+        const totalRouteDist = cumDist[cumDist.length - 1];
 
-          if (accumulatedDist >= ARROW_INTERVAL_METERS && segDist >= 4) {
-            accumulatedDist = 0;
-            const bearing = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
-            const midLat = (p1[0] + p2[0]) / 2;
-            const midLng = (p1[1] + p2[1]) / 2;
+        // Animate moving directional arrows along polyline
+        if (totalRouteDist >= 50 && latLngs.length >= 2) {
+          const ARROW_SPACING = Math.max(200, Math.min(380, totalRouteDist / 8));
+          const numArrows = Math.max(2, Math.min(18, Math.round(totalRouteDist / ARROW_SPACING)));
+          const stepDist = totalRouteDist / numArrows;
 
-            const arrowIcon = L.divIcon({
-              className: "route-arrow-marker",
-              html: `
-                <div class="route-arrow-wrap" style="transform: rotate(${Math.round(bearing)}deg);">
-                  <div class="route-arrow-pulse">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
-                      <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
-                    </svg>
-                  </div>
-                </div>
-              `,
-              iconSize: [14, 14],
-              iconAnchor: [7, 7]
-            });
+          for (let k = 0; k < numArrows; k++) {
+            const initialDist = (k * stepDist) % totalRouteDist;
+            const pt = getRoutePointAtDistance(latLngs, cumDist, totalRouteDist, initialDist);
 
-            L.marker([midLat, midLng], {
-              icon: arrowIcon,
-              zIndexOffset: 2500,
+            const wrapEl = document.createElement("div");
+            wrapEl.className = "route-moving-arrow-wrap";
+            wrapEl.innerHTML = `
+              <div class="route-moving-arrow" style="transform: rotate(${Math.round(pt.bearing)}deg);">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff">
+                  <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
+                </svg>
+              </div>
+            `;
+
+            const arrowMarker = L.marker([pt.lat, pt.lng], {
+              icon: L.divIcon({
+                className: "route-arrow-marker",
+                html: wrapEl,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+              }),
+              zIndexOffset: 2600,
               interactive: false
             }).addTo(routeLayerGroup);
+
+            movingArrowMarkers.push({
+              marker: arrowMarker,
+              arrowEl: wrapEl.querySelector(".route-moving-arrow"),
+              currentDist: initialDist,
+              lastBearing: pt.bearing
+            });
           }
+
+          // Start continuous animation loop
+          const SPEED_MPS = 42; // speed: ~42 m/s (smooth flowing visual speed)
+          let lastTimestamp = performance.now();
+
+          const animateRoute = (timestamp) => {
+            const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
+            lastTimestamp = timestamp;
+
+            const moveDelta = SPEED_MPS * dt;
+            for (let i = 0; i < movingArrowMarkers.length; i++) {
+              const item = movingArrowMarkers[i];
+              item.currentDist = (item.currentDist + moveDelta) % totalRouteDist;
+              const pt = getRoutePointAtDistance(latLngs, cumDist, totalRouteDist, item.currentDist);
+
+              item.marker.setLatLng([pt.lat, pt.lng]);
+              if (Math.abs(pt.bearing - item.lastBearing) > 1.2) {
+                item.arrowEl.style.transform = `rotate(${Math.round(pt.bearing)}deg)`;
+                item.lastBearing = pt.bearing;
+              }
+            }
+
+            routeAnimationId = requestAnimationFrame(animateRoute);
+          };
+
+          routeAnimationId = requestAnimationFrame(animateRoute);
         }
 
         // Add 3D High-Contrast Neon numbered waypoint badges on map (Phương án 5)
