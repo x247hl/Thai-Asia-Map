@@ -44,6 +44,71 @@
 
     #map { width: 100%; height: 100%; }
 
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: #f6f7fb;
+      box-sizing: border-box;
+    }
+
+    .auth-overlay.hidden {
+      display: none;
+    }
+
+    .auth-card {
+      width: min(340px, 100%);
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 8px 28px rgba(15,23,42,.18);
+      box-sizing: border-box;
+    }
+
+    .auth-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .auth-input {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #d6d9df;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 16px;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+
+    .auth-button {
+      width: 100%;
+      height: 42px;
+      border: 0;
+      border-radius: 10px;
+      background: #f27618;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .auth-error {
+      display: none;
+      color: #c62828;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .auth-error.show {
+      display: block;
+    }
+
     .top-panel {
       position: fixed;
       right: 10px;
@@ -497,6 +562,15 @@
 </head>
 
 <body>
+  <div id="authOverlay" class="auth-overlay">
+    <form id="authForm" class="auth-card">
+      <div class="auth-title">Thai Asia Map</div>
+      <input id="authPassword" class="auth-input" type="password" placeholder="Mật khẩu" autocomplete="current-password" />
+      <button class="auth-button" type="submit">Vào app</button>
+      <div id="authError" class="auth-error">Sai mật khẩu</div>
+    </form>
+  </div>
+
   <div id="map"></div>
 
   <div class="top-panel">
@@ -570,6 +644,9 @@
 
   <script>
     const API_BASE = "https://api.thaiasiasushibar.de/api";
+    // Đổi mật khẩu tại đây. Sau khi đổi và push/deploy, thiết bị cũ sẽ phải nhập lại.
+    const APP_PASSWORD = "thaiasia";
+    const AUTH_STORAGE_KEY = "thaiasia.map.authToken";
 
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
     const REFRESH_MS = 20000;
@@ -640,8 +717,13 @@
     // Lưu trạng thái bật/tắt từng shipper.
     const shipperVisibility = loadShipperVisibility();
     let lastShippers = [];
+    let appUnlocked = false;
 
     const els = {
+      authOverlay: document.getElementById("authOverlay"),
+      authForm: document.getElementById("authForm"),
+      authPassword: document.getElementById("authPassword"),
+      authError: document.getElementById("authError"),
       filterButton: document.getElementById("filterButton"),
       filterPanel: document.getElementById("filterPanel"),
       statusFilter: document.getElementById("statusFilter"),
@@ -664,6 +746,56 @@
 
     map.on("zoomend", updateZoomDisplay);
     updateZoomDisplay();
+
+    function hashString(value) {
+      let hash = 2166136261;
+      const text = String(value);
+      for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(16);
+    }
+
+    function getAuthToken() {
+      return hashString(`thaiasia:${APP_PASSWORD}`);
+    }
+
+    function hasSavedAccess() {
+      try {
+        return localStorage.getItem(AUTH_STORAGE_KEY) === getAuthToken();
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function unlockApp() {
+      appUnlocked = true;
+      els.authOverlay.classList.add("hidden");
+      els.authError.classList.remove("show");
+      els.authPassword.value = "";
+      setTimeout(() => {
+        map.invalidateSize();
+        startPolling();
+      }, 0);
+    }
+
+    els.authForm.addEventListener("submit", event => {
+      event.preventDefault();
+
+      if (els.authPassword.value === APP_PASSWORD) {
+        try {
+          localStorage.setItem(AUTH_STORAGE_KEY, getAuthToken());
+        } catch (err) {
+          console.warn("Không lưu được trạng thái đăng nhập:", err);
+        }
+        unlockApp();
+        return;
+      }
+
+      els.authError.classList.add("show");
+      els.authPassword.select();
+    });
 
     els.reloadButton.addEventListener("click", () => {
       els.reloadButton.classList.add("loading");
@@ -1248,18 +1380,22 @@
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         stopPolling();
-      } else {
+      } else if (appUnlocked) {
         startPolling({ resetView: true });
       }
     });
 
     window.addEventListener("pageshow", event => {
-      if (event.persisted && !document.hidden) {
+      if (event.persisted && !document.hidden && appUnlocked) {
         startPolling({ resetView: true });
       }
     });
 
-    startPolling();
+    if (hasSavedAccess()) {
+      unlockApp();
+    } else {
+      setTimeout(() => els.authPassword.focus(), 0);
+    }
   </script>
 
   <script>
