@@ -1401,13 +1401,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v41</span>
-    </div>
-
-    <div id="pwaInstallRow" class="update-row hidden" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 10px;">
-      <button id="pwaInstallBtn" type="button" style="width: 100%; height: 36px; background: #7c3aed; color: #fff; border: 0; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 3px 10px rgba(124, 58, 237, 0.3);">
-        📲 Cài đặt App ra màn hình
-      </button>
+      <span style="font-weight: 700; color: #7c3aed;">v43</span>
     </div>
   </div>
 
@@ -1716,37 +1710,37 @@
     }
 
     let lastHiddenAt = 0;
+    let isResuming = false;
 
     async function handleAppResume() {
-      if (document.hidden) return;
+      if (document.hidden || isResuming) return;
+      isResuming = true;
 
-      // Nếu app vừa quay lại từ chạy ẩn (ẩn ít nhất 1.5s), reload để nạp toàn bộ code & tính năng mới nhất từ GitHub
-      if (lastHiddenAt > 0 && (Date.now() - lastHiddenAt > 1500)) {
-        lastHiddenAt = 0;
+      try {
         if ("serviceWorker" in navigator) {
           try {
             const reg = await navigator.serviceWorker.getRegistration();
             if (reg) await reg.update();
-          } catch (e) { }
+          } catch (e) {}
         }
-        window.location.reload();
-        return;
-      }
 
-      if (!hasSavedAccess()) {
-        lockApp();
-        return;
-      }
+        if (!hasSavedAccess()) {
+          lockApp();
+          return;
+        }
 
-      const isStillValid = await syncLatestPassword();
-      if (!isStillValid || !hasSavedAccess()) {
-        return;
-      }
+        const isStillValid = await syncLatestPassword();
+        if (!isStillValid || !hasSavedAccess()) {
+          return;
+        }
 
-      if (!appUnlocked) {
-        unlockApp();
-      } else {
-        startPolling({ resetView: true });
+        if (!appUnlocked) {
+          unlockApp();
+        } else {
+          startPolling();
+        }
+      } finally {
+        isResuming = false;
       }
     }
 
@@ -3239,13 +3233,13 @@
     }
 
 
-    async function refreshAll() {
-      if (refreshing || !appUnlocked) return;
+    let lastRefreshCompletedAt = 0;
 
-      const isStillValid = await syncLatestPassword();
-      if (!isStillValid || !hasSavedAccess()) {
-        return;
-      }
+    async function refreshAll(force = false) {
+      if (refreshing || !appUnlocked) return;
+      const now = Date.now();
+      // Nếu không bắt buộc và vừa refresh cách đây dưới 3.5s, bỏ qua để tránh trùng request
+      if (!force && (now - lastRefreshCompletedAt < 3500)) return;
 
       refreshing = true;
       els.reloadButton.classList.add("loading");
@@ -3253,6 +3247,11 @@
       els.lastUpdate.textContent = "Đang tải...";
 
       try {
+        const isStillValid = await syncLatestPassword();
+        if (!isStillValid || !hasSavedAccess()) {
+          return;
+        }
+
         await Promise.all([loadOrders(), loadShippers()]);
 
         els.lastUpdate.textContent =
@@ -3261,6 +3260,7 @@
             minute: "2-digit",
             second: "2-digit"
           });
+        lastRefreshCompletedAt = Date.now();
       } catch (err) {
         console.error("Lỗi cập nhật dữ liệu:", err);
         els.lastUpdate.textContent = "Lỗi";
@@ -3276,8 +3276,10 @@
       if (options.resetView) {
         resetMapToRestaurant();
       }
-      refreshAll();
-      refreshTimer = setInterval(refreshAll, REFRESH_MS);
+      refreshAll(true);
+      refreshTimer = setInterval(() => {
+        refreshAll(false);
+      }, REFRESH_MS);
     }
 
     function stopPolling() {
@@ -3287,26 +3289,34 @@
       }
     }
 
+    let resumeDebounceTimer = null;
+    function triggerAppResume() {
+      if (resumeDebounceTimer) clearTimeout(resumeDebounceTimer);
+      resumeDebounceTimer = setTimeout(() => {
+        if (!document.hidden) {
+          handleAppResume();
+        }
+      }, 250);
+    }
+
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         lastHiddenAt = Date.now();
         stopPolling();
       } else {
-        handleAppResume();
+        triggerAppResume();
       }
     });
 
-    window.addEventListener("pageshow", event => {
-      if (!document.hidden && event.persisted) {
-        window.location.reload();
-      } else if (!document.hidden) {
-        handleAppResume();
+    window.addEventListener("pageshow", () => {
+      if (!document.hidden) {
+        triggerAppResume();
       }
     });
 
     window.addEventListener("focus", () => {
       if (!document.hidden) {
-        handleAppResume();
+        triggerAppResume();
       }
     });
 
@@ -3329,40 +3339,7 @@
           console.warn("Service Worker không đăng ký được:", err);
         });
       });
-
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.location.reload();
-      });
     }
-
-    let deferredInstallPrompt = null;
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      const installRow = document.getElementById("pwaInstallRow");
-      if (installRow) installRow.classList.remove("hidden");
-    });
-
-    const installBtn = document.getElementById("pwaInstallBtn");
-    if (installBtn) {
-      installBtn.addEventListener("click", async () => {
-        if (deferredInstallPrompt) {
-          deferredInstallPrompt.prompt();
-          const { outcome } = await deferredInstallPrompt.userChoice;
-          if (outcome === "accepted") {
-            deferredInstallPrompt = null;
-            const installRow = document.getElementById("pwaInstallRow");
-            if (installRow) installRow.classList.add("hidden");
-          }
-        }
-      });
-    }
-
-    window.addEventListener("appinstalled", () => {
-      deferredInstallPrompt = null;
-      const installRow = document.getElementById("pwaInstallRow");
-      if (installRow) installRow.classList.add("hidden");
-    });
   </script>
 
 </body>
