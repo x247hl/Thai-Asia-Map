@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Thai Asia Map</title>
+
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Thai Asia Map" />
+
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+
+
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Thai Asia Map" />
+
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        crossorigin="" />
+
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f3f3f3;
+    }
+
+    #map { width: 100%; height: 100%; }
+
+    .summary {
+      position: fixed;
+      left: 10px;
+      top: calc(10px + env(safe-area-inset-top));
+      z-index: 1000;
+      display: flex;
+      gap: 7px;
+      pointer-events: none;
+    }
+
+    .summary-pill {
+      background: rgba(255,255,255,.96);
+      padding: 8px 10px;
+      border-radius: 12px;
+      box-shadow: 0 3px 14px rgba(0,0,0,.18);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .summary-pill b {
+      font-size: 14px;
+      margin-right: 3px;
+    }
+
+    .filter-button {
+      position: fixed;
+      right: 12px;
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      z-index: 1100;
+      border: 0;
+      background: #fff;
+      border-radius: 999px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 3px 14px rgba(0,0,0,.22);
+      cursor: pointer;
+    }
+
+    .filter-panel {
+      position: fixed;
+      right: 12px;
+      bottom: calc(64px + env(safe-area-inset-bottom));
+      z-index: 1100;
+      width: min(285px, calc(100vw - 24px));
+      background: rgba(255,255,255,.98);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 5px 22px rgba(0,0,0,.23);
+      display: none;
+      box-sizing: border-box;
+    }
+
+    .filter-panel.open { display: block; }
+
+    .filter-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    select {
+      width: 100%;
+      height: 38px;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      padding: 0 9px;
+      background: #fff;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 7px 0;
+      font-size: 14px;
+    }
+
+    .update-row {
+      border-top: 1px solid #eee;
+      margin-top: 8px;
+      padding-top: 10px;
+      font-size: 12px;
+      color: #777;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .order-marker {
+      min-width: 52px;
+      padding: 5px 7px;
+      border-radius: 10px;
+      color: #fff;
+      text-align: center;
+      font-weight: 700;
+      font-size: 12px;
+      line-height: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+      border: 2px solid rgba(255,255,255,.9);
+    }
+
+    .order-new { background: #d83b3b; }
+    .order-inprocess { background: #f27618; }
+    .order-complete { background: #179b4c; }
+    .order-cancel { background: #777; }
+
+    .restaurant-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #d71920;
+      border: 3px solid #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 19px;
+      box-shadow: 0 2px 9px rgba(0,0,0,.35);
+      box-sizing: border-box;
+    }
+
+    .shipper-list {
+      border-top: 1px solid #eee;
+      margin-top: 8px;
+      padding-top: 9px;
+    }
+
+    .shipper-list-title {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .shipper-person-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 14px;
+    }
+
+    .shipper-person-row input {
+      margin: 0;
+    }
+
+    .shipper-person-row .name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .shipper-icon {
+      font-size: 25px;
+      line-height: 25px;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,.3));
+    }
+
+    .popup-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .popup-line { margin: 2px 0; }
+
+    @media (min-width: 769px) {
+      .summary {
+        left: 20px;
+        top: 20px;
+      }
+
+      .filter-button {
+        right: 20px;
+        bottom: 20px;
+      }
+
+      .filter-panel {
+        right: 20px;
+        bottom: 72px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <div class="summary">
+    <div class="summary-pill"><b id="orderCount">0</b> đơn</div>
+    <div class="summary-pill"><b id="shipperCount">0</b> shipper</div>
+  </div>
+
+  <button id="filterButton" class="filter-button" type="button">⚙ Bộ lọc</button>
+
+  <div id="filterPanel" class="filter-panel">
+    <div class="filter-title">Bộ lọc bản đồ</div>
+
+    <div class="field-label">Trạng thái đơn</div>
+    <select id="statusFilter">
+      <option value="all">Tất cả</option>
+      <option value="new">Đơn mới</option>
+      <option value="inprocess" selected>Tiếp nhận</option>
+      <option value="complete">Hoàn thành</option>
+      <option value="cancel">Hủy</option>
+    </select>
+
+    <label class="toggle-row">
+      <span>Chỉ hiện Giao hàng</span>
+      <input id="deliveryOnly" type="checkbox" checked />
+    </label>
+
+    <label class="toggle-row">
+      <span>Hiện đơn hàng</span>
+      <input id="showOrders" type="checkbox" checked />
+    </label>
+
+    <label class="toggle-row">
+      <span>Hiện shipper</span>
+      <input id="showShippers" type="checkbox" checked />
+    </label>
+
+    <div class="shipper-list">
+      <div class="shipper-list-title">Từng shipper</div>
+      <div id="shipperList">
+        <div style="font-size:12px;color:#999;padding:5px 0;">Đang tải...</div>
+      </div>
+    </div>
+
+    <div class="update-row">
+      <span>Tự cập nhật</span>
+      <span id="lastUpdate">—</span>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          crossorigin=""></script>
+
+  <script>
+    const API_BASE = "https://api.thaiasiasushibar.de/api";
+
+    // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
+    const REFRESH_MS = 20000;
+
+    // Thai Asia SushiBar, Leipziger Chaussee 147, Halle (Saale)
+    const RESTAURANT = {
+      name: "Thai Asia SushiBar",
+      lat: 51.4547,
+      lng: 12.01689
+    };
+
+    // Mỗi lần mở trang, map luôn bắt đầu tại quán.
+    // Dữ liệu đơn/shipper tải xong sẽ KHÔNG tự kéo map sang chỗ khác.
+    const map = L.map("map").setView([RESTAURANT.lat, RESTAURANT.lng], 14);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    const orderLayer = L.layerGroup().addTo(map);
+    const shipperLayer = L.layerGroup().addTo(map);
+
+    const restaurantIcon = L.divIcon({
+      className: "",
+      html: '<div class="restaurant-icon">🏪</div>',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+
+    L.marker([RESTAURANT.lat, RESTAURANT.lng], {
+      icon: restaurantIcon,
+      zIndexOffset: 1000
+    })
+      .bindPopup("<b>Thai Asia SushiBar</b><br>Leipziger Chaussee 147")
+      .addTo(map);
+
+    // Nút quay nhanh về tâm quán.
+    const HomeControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd: function () {
+        const container = L.DomUtil.create("div", "leaflet-bar");
+        const button = L.DomUtil.create("a", "", container);
+        button.href = "#";
+        button.title = "Về vị trí quán";
+        button.innerHTML = "⌂";
+        button.style.fontSize = "22px";
+        button.style.lineHeight = "30px";
+        button.style.textAlign = "center";
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(button, "click", L.DomEvent.preventDefault)
+                  .on(button, "click", () => {
+                    map.setView([RESTAURANT.lat, RESTAURANT.lng], 14);
+                  });
+        return container;
+      }
+    });
+    map.addControl(new HomeControl());
+
+    let refreshTimer = null;
+    let refreshing = false;
+
+    // Lưu trạng thái bật/tắt từng shipper.
+    const shipperVisibility = new Map();
+    let lastShippers = [];
+
+    const els = {
+      filterButton: document.getElementById("filterButton"),
+      filterPanel: document.getElementById("filterPanel"),
+      statusFilter: document.getElementById("statusFilter"),
+      deliveryOnly: document.getElementById("deliveryOnly"),
+      showOrders: document.getElementById("showOrders"),
+      showShippers: document.getElementById("showShippers"),
+      orderCount: document.getElementById("orderCount"),
+      shipperCount: document.getElementById("shipperCount"),
+      shipperList: document.getElementById("shipperList"),
+      lastUpdate: document.getElementById("lastUpdate")
+    };
+
+    els.filterButton.addEventListener("click", () => {
+      els.filterPanel.classList.toggle("open");
+    });
+
+    els.statusFilter.addEventListener("change", refreshAll);
+    els.deliveryOnly.addEventListener("change", refreshAll);
+
+    els.showOrders.addEventListener("change", () => {
+      if (els.showOrders.checked) {
+        if (!map.hasLayer(orderLayer)) orderLayer.addTo(map);
+      } else if (map.hasLayer(orderLayer)) {
+        map.removeLayer(orderLayer);
+      }
+    });
+
+    els.showShippers.addEventListener("change", () => {
+      if (els.showShippers.checked) {
+        if (!map.hasLayer(shipperLayer)) shipperLayer.addTo(map);
+      } else if (map.hasLayer(shipperLayer)) {
+        map.removeLayer(shipperLayer);
+      }
+    });
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function toNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function unwrapList(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      if (Array.isArray(payload?.data?.data)) return payload.data.data;
+      return [];
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status} ${url}`);
+      return res.json();
+    }
+
+    async function fetchOrdersByStatus(status) {
+      const url = `${API_BASE}/dh/?page=1&status=${encodeURIComponent(status)}`;
+      const payload = await fetchJson(url);
+      return unwrapList(payload);
+    }
+
+    async function loadOrders() {
+      const selected = els.statusFilter.value;
+
+      let statuses;
+      if (selected === "all") {
+        // "Tất cả": gộp 4 trạng thái đã xác nhận từ API.
+        statuses = ["new", "inprocess", "complete", "cancel"];
+      } else {
+        statuses = [selected];
+      }
+
+      const results = await Promise.all(
+        statuses.map(status => fetchOrdersByStatus(status))
+      );
+
+      let orders = results.flat();
+
+      // Tránh trùng đơn nếu backend trả cùng đơn ở nhiều trạng thái.
+      const unique = new Map();
+      orders.forEach(order => unique.set(order.id || order.code, order));
+      orders = Array.from(unique.values());
+
+      if (els.deliveryOnly.checked) {
+        orders = orders.filter(order => order.shipping_method === "home_delivery");
+      }
+
+      renderOrders(orders);
+      return orders;
+    }
+
+    function orderStatusText(status, statusTitle) {
+      if (statusTitle) return statusTitle;
+      if (status === "new") return "Đơn mới";
+      if (status === "inprocess") return "Tiếp nhận";
+      if (status === "complete") return "Hoàn thành";
+      if (status === "cancel") return "Hủy";
+      return status || "Không rõ";
+    }
+
+    function orderClass(status) {
+      if (status === "new") return "order-new";
+      if (status === "complete") return "order-complete";
+      if (status === "cancel") return "order-cancel";
+      return "order-inprocess";
+    }
+
+    function formatOrderTime(createdAt) {
+      if (!createdAt) return "";
+      const d = new Date(createdAt);
+      if (Number.isNaN(d.getTime())) return "";
+
+      return new Intl.DateTimeFormat("vi-VN", {
+        timeZone: "Europe/Berlin",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).format(d);
+    }
+
+    function formatOrderDateTime(createdAt) {
+      if (!createdAt) return "";
+      const d = new Date(createdAt);
+      if (Number.isNaN(d.getTime())) return "";
+
+      return new Intl.DateTimeFormat("vi-VN", {
+        timeZone: "Europe/Berlin",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).format(d);
+    }
+
+    function formatEuro(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return "";
+      return new Intl.NumberFormat("de-DE", {
+        style: "currency",
+        currency: "EUR"
+      }).format(n);
+    }
+
+    function renderOrders(orders) {
+      orderLayer.clearLayers();
+      const points = [];
+
+      orders.forEach(order => {
+        const lat = toNumber(order.latitude);
+        const lng = toNumber(order.longitude);
+        if (lat === null || lng === null) return;
+
+        const time = formatOrderTime(order.created_at);
+        const code = order.code ?? "?";
+        const status = order.status ?? "";
+
+        const icon = L.divIcon({
+          className: "",
+          html: `
+            <div class="order-marker ${orderClass(status)}">
+              #${escapeHtml(code)}
+              ${time ? `<br>${escapeHtml(time)}` : ""}
+            </div>
+          `,
+          iconSize: [60, 44],
+          iconAnchor: [30, 22]
+        });
+
+        const fullName = `${order.first_name ?? ""} ${order.last_name ?? ""}`.trim();
+        const fullAddress = [
+          order.address,
+          order.apartment_number ? `Nr. ${order.apartment_number}` : "",
+          order.postcode,
+          order.city
+        ].filter(Boolean).join(", ");
+
+        const popup = `
+          <div>
+            <div class="popup-title">Đơn #${escapeHtml(code)}</div>
+            <div class="popup-line"><b>${escapeHtml(orderStatusText(status, order.status_title))}</b></div>
+            ${fullName ? `<div class="popup-line">${escapeHtml(fullName)}</div>` : ""}
+            ${fullAddress ? `<div class="popup-line">${escapeHtml(fullAddress)}</div>` : ""}
+            ${order.created_at ? `<div class="popup-line">${escapeHtml(formatOrderDateTime(order.created_at))}</div>` : ""}
+            <div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>
+            ${order.payment ? `<div class="popup-line">Thanh toán: ${escapeHtml(order.payment)}</div>` : ""}
+          </div>
+        `;
+
+        L.marker([lat, lng], { icon })
+          .bindPopup(popup)
+          .addTo(orderLayer);
+
+        points.push([lat, lng]);
+      });
+
+      els.orderCount.textContent = String(orders.length);
+    }
+
+    function getShipperKey(shipper) {
+      return String(
+        shipper?.user?.id ||
+        shipper?.user_id ||
+        shipper?.id ||
+        shipper?.user?.name ||
+        shipper?.name ||
+        "unknown"
+      );
+    }
+
+    function isShipperVisible(shipper) {
+      const key = getShipperKey(shipper);
+      if (!shipperVisibility.has(key)) {
+        shipperVisibility.set(key, true);
+      }
+      return shipperVisibility.get(key) !== false;
+    }
+
+    function renderShipperFilter(shippers) {
+      els.shipperList.innerHTML = "";
+
+      if (!shippers.length) {
+        els.shipperList.innerHTML =
+          '<div style="font-size:12px;color:#999;padding:5px 0;">Không có shipper</div>';
+        return;
+      }
+
+      shippers.forEach(shipper => {
+        const key = getShipperKey(shipper);
+        const name = shipper?.user?.name || shipper?.name || "Shipper";
+
+        if (!shipperVisibility.has(key)) {
+          shipperVisibility.set(key, true);
+        }
+
+        const label = document.createElement("label");
+        label.className = "shipper-person-row";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = shipperVisibility.get(key) !== false;
+
+        checkbox.addEventListener("change", () => {
+          shipperVisibility.set(key, checkbox.checked);
+          renderShippers(lastShippers);
+        });
+
+        const icon = document.createElement("span");
+        icon.textContent = "🛵";
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "name";
+        nameEl.textContent = name;
+
+        label.appendChild(checkbox);
+        label.appendChild(icon);
+        label.appendChild(nameEl);
+        els.shipperList.appendChild(label);
+      });
+    }
+
+    function renderShippers(shippers) {
+      shipperLayer.clearLayers();
+
+      shippers.forEach(shipper => {
+        if (!isShipperVisible(shipper)) return;
+
+        const lat = toNumber(shipper.latitude ?? shipper.lat);
+        const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
+        if (lat === null || lng === null) return;
+
+        const name = shipper?.user?.name || shipper?.name || "Shipper";
+        const online = shipper?.is_online === true;
+
+        const icon = L.divIcon({
+          className: "",
+          html: `<div class="shipper-icon">${online ? "🛵" : "⚪"}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+
+        const popup = `
+          <div>
+            <div class="popup-title">${escapeHtml(name)}</div>
+            <div class="popup-line">Trạng thái: ${online ? "Online" : "Offline"}</div>
+            <div class="popup-line">Tốc độ: ${escapeHtml(shipper.speed ?? 0)}</div>
+            ${shipper.accuracy != null ? `<div class="popup-line">GPS: ${escapeHtml(shipper.accuracy)} m</div>` : ""}
+          </div>
+        `;
+
+        L.marker([lat, lng], { icon })
+          .bindPopup(popup)
+          .addTo(shipperLayer);
+      });
+
+      els.shipperCount.textContent =
+        String(shippers.filter(s => s?.is_online === true).length);
+    }
+
+    async function loadShippers() {
+      const payload = await fetchJson(`${API_BASE}/shipper-locations`);
+      const shippers = unwrapList(payload);
+
+      lastShippers = shippers;
+      renderShipperFilter(shippers);
+      renderShippers(shippers);
+
+      return shippers;
+    }
+
+
+    async function refreshAll() {
+      if (refreshing) return;
+      refreshing = true;
+
+      try {
+        await Promise.all([loadOrders(), loadShippers()]);
+
+        els.lastUpdate.textContent =
+          new Date().toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+          });
+      } catch (err) {
+        console.error("Lỗi cập nhật dữ liệu:", err);
+        els.lastUpdate.textContent = "Lỗi";
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    function startPolling() {
+      stopPolling();
+      refreshAll();
+      refreshTimer = setInterval(refreshAll, REFRESH_MS);
+    }
+
+    function stopPolling() {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        startPolling();
+      }
+    });
+
+    startPolling();
+  </script>
+
+  <script>
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(err => {
+          console.warn("Service Worker không đăng ký được:", err);
+        });
+      });
+    }
+  </script>
+
+</body>
+</html>
