@@ -671,7 +671,7 @@
   <script>
     const API_BASE = "https://api.thaiasiasushibar.de/api";
     // Đổi mật khẩu tại đây. Sau khi đổi và push/deploy, thiết bị cũ sẽ phải nhập lại.
-    const APP_PASSWORD = "123456";
+    const APP_PASSWORD = "12345";
     const AUTH_STORAGE_KEY = "thaiasia.map.authToken";
 
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
@@ -687,7 +687,7 @@
     const DEFAULT_ZOOM_WEB = 12;
     const DEFAULT_ZOOM_ANDROID = 12;
     const DEFAULT_ZOOM_IPHONE = 11;
-    const SHIPPER_FOCUS_ZOOM = 17;
+    const SHIPPER_FOCUS_ZOOM = 14;
 
     function getDefaultZoom() {
       const platform = navigator.userAgent || navigator.platform || "";
@@ -1203,7 +1203,7 @@
       const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
       if (lat === null || lng === null) return;
 
-      map.setView([lat, lng], Math.max(map.getZoom(), SHIPPER_FOCUS_ZOOM), {
+      map.setView([lat, lng], SHIPPER_FOCUS_ZOOM, {
         animate: true
       });
     }
