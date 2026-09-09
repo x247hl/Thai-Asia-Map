@@ -5,7 +5,9 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "fullscreen", "browser"],
   "orientation": "any",
+  "prefer_related_applications": false,
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [

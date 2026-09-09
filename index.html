@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -23,16 +23,32 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <style>
-    html,
-    body {
+    html {
       width: 100%;
       height: 100%;
-      min-height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #f3f3f3;
+    }
+
+    body {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      min-width: 100vw;
+      min-height: 100vh;
+      min-height: 100dvh;
       margin: 0;
       padding: 0;
       overflow: hidden;
       font-family: Arial, Helvetica, sans-serif;
-      background: #0f172a;
+      background: #f3f3f3;
       touch-action: manipulation;
       -webkit-user-select: none;
       user-select: none;
@@ -42,6 +58,8 @@
       position: absolute;
       top: 0;
       left: 0;
+      right: 0;
+      bottom: 0;
       width: 100%;
       height: 100%;
       z-index: 1;
@@ -1383,7 +1401,13 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v38</span>
+      <span style="font-weight: 700; color: #7c3aed;">v40</span>
+    </div>
+
+    <div id="pwaInstallRow" class="update-row hidden" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 10px;">
+      <button id="pwaInstallBtn" type="button" style="width: 100%; height: 36px; background: #7c3aed; color: #fff; border: 0; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 3px 10px rgba(124, 58, 237, 0.3);">
+        📲 Cài đặt App ra màn hình
+      </button>
     </div>
   </div>
 
@@ -3310,6 +3334,35 @@
         window.location.reload();
       });
     }
+
+    let deferredInstallPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const installRow = document.getElementById("pwaInstallRow");
+      if (installRow) installRow.classList.remove("hidden");
+    });
+
+    const installBtn = document.getElementById("pwaInstallBtn");
+    if (installBtn) {
+      installBtn.addEventListener("click", async () => {
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          const { outcome } = await deferredInstallPrompt.userChoice;
+          if (outcome === "accepted") {
+            deferredInstallPrompt = null;
+            const installRow = document.getElementById("pwaInstallRow");
+            if (installRow) installRow.classList.add("hidden");
+          }
+        }
+      });
+    }
+
+    window.addEventListener("appinstalled", () => {
+      deferredInstallPrompt = null;
+      const installRow = document.getElementById("pwaInstallRow");
+      if (installRow) installRow.classList.add("hidden");
+    });
   </script>
 
 </body>
