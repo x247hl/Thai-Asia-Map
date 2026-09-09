@@ -312,6 +312,21 @@
       transform: translateX(-50%);
     }
 
+    .order-marker.route-ready .order-marker-panel {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, .3), 0 4px 14px rgba(127, 29, 29, .34);
+    }
+
+    .order-marker.route-ready .order-marker-pointer {
+      border-top-color: #ef4444;
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .16)) drop-shadow(0 0 4px rgba(239, 68, 68, .5));
+    }
+
+    .order-marker.route-ready .order-marker-dot {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, .26), 0 1px 5px rgba(0, 0, 0, .24);
+    }
+
     .order-marker-pointer {
       position: absolute;
       left: 50%;
@@ -1595,7 +1610,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v54</span>
+      <span style="font-weight: 700; color: #7c3aed;">v55</span>
     </div>
   </div>
 
@@ -1606,6 +1621,9 @@
     // Đổi mật khẩu tại đây. Sau khi đổi và push/deploy, thiết bị cũ sẽ phải nhập lại.
     let APP_PASSWORD = "12345";
     const AUTH_STORAGE_KEY = "thaiasia.map.authToken";
+
+    // Bật/tắt hiển thị "Tổng: ... €" trong thông tin đơn hàng (true = bật, false = tắt)
+    let SHOW_ORDER_TOTAL = false;
 
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
     const REFRESH_MS = 20000;
@@ -1746,6 +1764,7 @@
       routeReturnToShop = false;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
+      updateRouteReadyOrderMarkerUi();
       if (routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
         toggleRoutePanel(true);
@@ -2403,7 +2422,7 @@
         const icon = L.divIcon({
           className: "",
           html: `
-            <div class="order-marker ${orderClass(order)}">
+            <div class="order-marker ${orderClass(order)}" data-order-key="${escapeHtml(orderKey)}">
               <div class="order-marker-panel">
                 #${escapeHtml(code)}
                 ${time ? `<br>${escapeHtml(time)}` : ""}
@@ -2439,7 +2458,7 @@
             ${orderTime ? `<div class="popup-line">Thời gian: ${escapeHtml(orderTime)}</div>` : ""}
             ${noteHtml}
             ${renderOrderItems(order.items)}
-            <div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>
+            ${SHOW_ORDER_TOTAL ? `<div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>` : ""}
           </div>
         `;
 
@@ -2456,10 +2475,36 @@
           const inRoute = routeOrderKeys.includes(orderKey);
 
           if (inRoute) {
-            // Đơn đã có trong lộ trình -> Mở chi tiết đơn
-            focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
-            marker.openPopup();
-            lastInteractedOrderKey = orderKey;
+            // Đơn đã được chọn ghép -> click lại để bỏ khỏi lộ trình
+            routeOrderKeys = routeOrderKeys.filter(key => key !== orderKey);
+            if (routeOrderKeys.length === 0) {
+              isRoutingArmed = false;
+              lastInteractedOrderKey = null;
+              routeStartType = null;
+              routeReturnToShop = false;
+            } else {
+              lastInteractedOrderKey = routeOrderKeys[routeOrderKeys.length - 1];
+            }
+            marker.closePopup();
+            map.closePopup();
+            updateRouteReadyOrderMarkerUi();
+            updateRouteToggleButtonsUi();
+            renderRoutePanelUi();
+            calculateAndDrawRoute();
+            if (routeOrderKeys.length === 0) {
+              toggleRoutePanel(false);
+            }
+            return;
+          }
+
+          if (!isRoutingArmed && routeOrderKeys.length === 0 && lastInteractedOrderKey === orderKey) {
+            // Đơn đầu tiên đang chờ ghép -> click lại để bỏ trạng thái chờ ghép
+            lastInteractedOrderKey = null;
+            marker.closePopup();
+            map.closePopup();
+            updateRouteReadyOrderMarkerUi();
+            updateRouteToggleButtonsUi();
+            renderRoutePanelUi();
             return;
           }
 
@@ -2472,6 +2517,8 @@
             routeOrderKeys.push(orderKey);
             isRoutingArmed = true;
             lastInteractedOrderKey = orderKey;
+            updateRouteReadyOrderMarkerUi();
+            updateRouteToggleButtonsUi();
             renderRoutePanelUi();
             calculateAndDrawRoute();
             toggleRoutePanel(true);
@@ -2484,6 +2531,8 @@
             lastInteractedOrderKey = orderKey;
             focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
             marker.openPopup();
+            updateRouteReadyOrderMarkerUi();
+            updateRouteToggleButtonsUi();
           } else {
             // Trước đó đã click vào 1 đơn khác (ví dụ: đã xem #9 rồi tắt/chuyển qua #7) -> Nối ghép #9 và #7!
             setTimeout(() => {
@@ -2499,6 +2548,8 @@
             }
             isRoutingArmed = true;
             lastInteractedOrderKey = orderKey;
+            updateRouteReadyOrderMarkerUi();
+            updateRouteToggleButtonsUi();
             renderRoutePanelUi();
             calculateAndDrawRoute();
             toggleRoutePanel(true);
@@ -2528,6 +2579,8 @@
       isRefreshingOrders = false;
 
       renderRoutePanelUi();
+      updateRouteReadyOrderMarkerUi();
+      updateRouteToggleButtonsUi();
       calculateAndDrawRoute();
 
       els.orderCount.textContent = String(orders.length);
@@ -2536,6 +2589,31 @@
     }
 
     // ===== MULTI-STOP ROUTE PLANNER CORE =====
+    function isRouteReadyOrderKey(orderKey) {
+      return !!orderKey
+        && (
+          routeOrderKeys.includes(orderKey)
+          || (lastInteractedOrderKey === orderKey && !isRoutingArmed && routeOrderKeys.length === 0)
+        );
+    }
+
+    function updateRouteReadyOrderMarkerUi() {
+      orderLayer.getLayers().forEach(layer => {
+        const markerEl = typeof layer.getElement === "function" ? layer.getElement() : null;
+        const orderEl = markerEl ? markerEl.querySelector(".order-marker[data-order-key]") : null;
+        if (!orderEl) return;
+        orderEl.classList.toggle("route-ready", isRouteReadyOrderKey(orderEl.dataset.orderKey));
+      });
+    }
+
+    function updateRouteToggleButtonsUi() {
+      document.querySelectorAll(".btn-toggle-route[data-order-key]").forEach(btn => {
+        const inRoute = routeOrderKeys.includes(btn.dataset.orderKey);
+        btn.classList.toggle("in-route", inRoute);
+        btn.innerHTML = inRoute ? "➖ Bỏ khỏi lộ trình" : "➕ Thêm vào lộ trình";
+      });
+    }
+
     function updateRouteBadge() {
       const count = routeOrderKeys.length;
       if (els.routeBadge) {
@@ -2832,6 +2910,8 @@
       routeReturnToShop = true;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
+      updateRouteReadyOrderMarkerUi();
+      updateRouteToggleButtonsUi();
       renderRoutePanelUi();
       calculateAndDrawRoute();
       if (isSame) {
@@ -2880,13 +2960,10 @@
         lastInteractedOrderKey = orderKey;
         toggleRoutePanel(true);
       }
+      updateRouteReadyOrderMarkerUi();
+      updateRouteToggleButtonsUi();
       renderRoutePanelUi();
       calculateAndDrawRoute();
-      document.querySelectorAll(`.btn-toggle-route[data-order-key="${orderKey}"]`).forEach(btn => {
-        const inRoute = routeOrderKeys.includes(orderKey);
-        btn.classList.toggle("in-route", inRoute);
-        btn.innerHTML = inRoute ? "➖ Bỏ khỏi lộ trình" : "➕ Thêm vào lộ trình";
-      });
     };
 
     window.moveRouteOrder = function (index, direction) {
@@ -2908,12 +2985,10 @@
           routeStartType = null;
           routeReturnToShop = false;
         }
+        updateRouteReadyOrderMarkerUi();
+        updateRouteToggleButtonsUi();
         renderRoutePanelUi();
         calculateAndDrawRoute();
-        document.querySelectorAll(`.btn-toggle-route[data-order-key="${removedKey}"]`).forEach(btn => {
-          btn.classList.remove("in-route");
-          btn.innerHTML = "➕ Thêm vào lộ trình";
-        });
       }
     };
 
@@ -2969,6 +3044,8 @@
       routeReturnToShop = false;
       isRoutingArmed = false;
       lastInteractedOrderKey = null;
+      updateRouteReadyOrderMarkerUi();
+      updateRouteToggleButtonsUi();
       routeLayerGroup.clearLayers();
       routePolylineOutline = null;
       routePolylineInner = null;
@@ -2986,7 +3063,10 @@
         routeStartType = "restaurant";
         routeReturnToShop = true;
         isRoutingArmed = true;
+        lastInteractedOrderKey = null;
         renderRoutePanelUi();
+        updateRouteReadyOrderMarkerUi();
+        updateRouteToggleButtonsUi();
         await calculateAndDrawRoute();
       }
 
@@ -3338,6 +3418,7 @@
       routeReturnToShop = false;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
+      updateRouteReadyOrderMarkerUi();
       if (routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
         toggleRoutePanel(true);
@@ -3751,6 +3832,7 @@
           routeReturnToShop = false;
           isRoutingArmed = true;
           lastInteractedOrderKey = null;
+          updateRouteReadyOrderMarkerUi();
           if (routeOrderKeys.length > 0) {
             calculateAndDrawRoute();
             toggleRoutePanel(true);
