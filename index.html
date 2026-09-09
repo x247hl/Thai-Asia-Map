@@ -1250,28 +1250,6 @@
     </div>
 
     <div class="route-body">
-      <div class="route-field">
-        <label for="routeStartSelect" class="route-label">Điểm xuất phát:</label>
-        <select id="routeStartSelect" class="route-select">
-          <option value="restaurant">🏪 Tại quán</option>
-        </select>
-      </div>
-
-      <div class="route-field">
-        <div class="route-label-row">
-          <span class="route-label">Các điểm giao (thứ tự):</span>
-          <span id="routeStopCount" class="route-count-label">0 đơn</span>
-        </div>
-        <div id="routeStopsList" class="route-stops-list">
-          <div class="route-empty-hint">Chưa chọn đơn nào.<br>Bấm <b>➕ Lộ trình</b> trong chi tiết đơn để thêm.</div>
-        </div>
-      </div>
-
-      <div id="routeQuickAddRow" class="route-quick-add-row hidden">
-        <span class="route-quick-label">Thêm nhanh đơn chờ:</span>
-        <div id="routeQuickChips" class="route-quick-chips"></div>
-      </div>
-
       <label class="route-toggle-row">
         <input id="routeReturnToShop" type="checkbox" />
         <span>Quay về Quán khi giao xong</span>
@@ -1418,12 +1396,11 @@
     const shipperLayer = L.layerGroup().addTo(map);
     const routeLayerGroup = L.layerGroup().addTo(map);
 
-    const ROUTE_START_TYPE_KEY = "thaiasia.routeStartType";
     const ROUTE_RETURN_TO_SHOP_KEY = "thaiasia.routeReturnToShop";
     let routeOrderKeys = [];
     let isRoutingArmed = false;
     let lastInteractedOrderKey = null;
-    let routeStartType = localStorage.getItem(ROUTE_START_TYPE_KEY) || "restaurant";
+    let routeStartType = null;
     let routeReturnToShop = localStorage.getItem(ROUTE_RETURN_TO_SHOP_KEY) !== "0";
     let routePolylineOutline = null;
     let routePolylineInner = null;
@@ -1451,12 +1428,6 @@
       routeStartType = "restaurant";
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
-      try {
-        localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
-      } catch (err) {}
-      if (els.routeStartSelect) {
-        els.routeStartSelect.value = "restaurant";
-      }
       if (routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
         toggleRoutePanel(true);
@@ -1486,11 +1457,6 @@
       routeBadge: document.getElementById("routeBadge"),
       routePanel: document.getElementById("routePanel"),
       routeCloseButton: document.getElementById("routeCloseButton"),
-      routeStartSelect: document.getElementById("routeStartSelect"),
-      routeStopCount: document.getElementById("routeStopCount"),
-      routeStopsList: document.getElementById("routeStopsList"),
-      routeQuickAddRow: document.getElementById("routeQuickAddRow"),
-      routeQuickChips: document.getElementById("routeQuickChips"),
       routeReturnToShop: document.getElementById("routeReturnToShop"),
       routeSummaryBox: document.getElementById("routeSummaryBox"),
       routeTotalDist: document.getElementById("routeTotalDist"),
@@ -1696,18 +1662,6 @@
       els.routeCloseButton.addEventListener("click", () => {
         if (typeof toggleRoutePanel === "function") {
           toggleRoutePanel(false);
-        }
-      });
-    }
-
-    if (els.routeStartSelect) {
-      els.routeStartSelect.addEventListener("change", () => {
-        routeStartType = els.routeStartSelect.value;
-        try {
-          localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
-        } catch (err) { }
-        if (typeof calculateAndDrawRoute === "function") {
-          calculateAndDrawRoute();
         }
       });
     }
@@ -2224,94 +2178,11 @@
       }
     }
 
-    function updateRouteStartOptions() {
-      if (!els.routeStartSelect) return;
-      const savedStart = localStorage.getItem(ROUTE_START_TYPE_KEY) || routeStartType || "restaurant";
-      els.routeStartSelect.innerHTML = `
-        <option value="restaurant">🏪 Tại quán</option>
-      `;
-
-      if (Array.isArray(lastShippers)) {
-        lastShippers.forEach(shipper => {
-          if (!isShipperVisible(shipper)) return;
-          const key = getShipperKey(shipper);
-          const name = shipper?.user?.name || shipper?.name || "Shipper";
-          const opt = document.createElement("option");
-          opt.value = `shipper:${key}`;
-          opt.textContent = `🚗 ${name}`;
-          els.routeStartSelect.appendChild(opt);
-        });
-      }
-
-      if (els.routeStartSelect.querySelector && els.routeStartSelect.querySelector(`option[value="${savedStart}"]`)) {
-        els.routeStartSelect.value = savedStart;
-        routeStartType = savedStart;
-      } else {
-        els.routeStartSelect.value = "restaurant";
-        routeStartType = "restaurant";
-      }
-    }
-
     function renderRoutePanelUi() {
-      updateRouteStartOptions();
       updateRouteBadge();
 
       if (els.routeReturnToShop) {
         els.routeReturnToShop.checked = routeReturnToShop;
-      }
-
-      if (!els.routeStopsList) return;
-      els.routeStopsList.innerHTML = "";
-
-      if (!routeOrderKeys.length) {
-        els.routeStopsList.innerHTML = `
-          <div class="route-empty-hint">Chưa chọn đơn nào.<br>Bấm <b>➕ Lộ trình</b> trong chi tiết đơn để thêm.</div>
-        `;
-        if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
-      } else {
-        routeOrderKeys.forEach((key, index) => {
-          const order = lastOrders.find(o => getOrderKey(o) === key);
-          const code = order?.code ?? key;
-          const addr = order ? formatOrderAddress(order) : "";
-
-          const item = document.createElement("div");
-          item.className = "route-stop-item";
-          item.innerHTML = `
-            <div class="route-stop-num">${index + 1}</div>
-            <div class="route-stop-info">
-              <div class="route-stop-name">Đơn #${escapeHtml(code)}</div>
-              ${addr ? `<div class="route-stop-addr">${escapeHtml(addr)}</div>` : ""}
-            </div>
-            <div class="route-stop-btns">
-              ${index > 0 ? `<button class="route-stop-btn" type="button" title="Lên" onclick="moveRouteOrder(${index}, -1)">▲</button>` : ""}
-              ${index < routeOrderKeys.length - 1 ? `<button class="route-stop-btn" type="button" title="Xuống" onclick="moveRouteOrder(${index}, 1)">▼</button>` : ""}
-              <button class="route-stop-btn delete" type="button" title="Xóa" onclick="removeRouteOrder(${index})">✕</button>
-            </div>
-          `;
-          els.routeStopsList.appendChild(item);
-        });
-      }
-
-      if (els.routeQuickAddRow && els.routeQuickChips) {
-        const remainingOrders = lastOrders.filter(o => !routeOrderKeys.includes(getOrderKey(o)));
-        if (remainingOrders.length > 0) {
-          els.routeQuickAddRow.classList.remove("hidden");
-          els.routeQuickChips.innerHTML = "";
-          remainingOrders.forEach(o => {
-            const key = getOrderKey(o);
-            const chip = document.createElement("button");
-            chip.type = "button";
-            chip.className = "route-chip";
-            chip.textContent = `+ #${o.code ?? '?'}`;
-            chip.title = formatOrderAddress(o);
-            chip.onclick = () => {
-              toggleOrderInRoute(key);
-            };
-            els.routeQuickChips.appendChild(chip);
-          });
-        } else {
-          els.routeQuickAddRow.classList.add("hidden");
-        }
       }
     }
 
@@ -2367,6 +2238,7 @@
 
     function clearRoute() {
       routeOrderKeys = [];
+      routeStartType = null;
       isRoutingArmed = false;
       lastInteractedOrderKey = null;
       routeLayerGroup.clearLayers();
@@ -2374,6 +2246,7 @@
       routePolylineInner = null;
       renderRoutePanelUi();
       if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
+      toggleRoutePanel(false);
       document.querySelectorAll(".btn-toggle-route").forEach(btn => {
         btn.classList.remove("in-route");
         btn.innerHTML = "➕ Thêm vào lộ trình";
@@ -2401,8 +2274,8 @@
       const waypoints = [];
       const waypointLabels = [];
 
-      // 1. Start point
-      if (routeStartType.startsWith("shipper:")) {
+      // 1. Start point (chỉ thêm nếu người dùng đã click chọn Shipper hoặc Quán)
+      if (routeStartType && routeStartType.startsWith("shipper:")) {
         const shipperKey = routeStartType.replace("shipper:", "");
         const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
         const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
@@ -2410,11 +2283,8 @@
         if (sLat !== null && sLng !== null) {
           waypoints.push([sLng, sLat]);
           waypointLabels.push(shipper?.user?.name || shipper?.name || "Shipper");
-        } else {
-          waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
-          waypointLabels.push("Tại quán");
         }
-      } else {
+      } else if (routeStartType === "restaurant") {
         waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
         waypointLabels.push("Tại quán");
       }
@@ -2438,7 +2308,13 @@
         waypointLabels.push("Về Quán");
       }
 
-      if (waypoints.length < 2) return;
+      if (waypoints.length < 2) {
+        routeLayerGroup.clearLayers();
+        routePolylineOutline = null;
+        routePolylineInner = null;
+        if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
+        return;
+      }
 
       try {
         const coordsStr = waypoints.map(pt => `${pt[0]},${pt[1]}`).join(";");
@@ -2630,12 +2506,6 @@
       routeStartType = `shipper:${key}`;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
-      try {
-        localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
-      } catch (err) {}
-      if (els.routeStartSelect) {
-        els.routeStartSelect.value = routeStartType;
-      }
       if (routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
         toggleRoutePanel(true);
@@ -3048,12 +2918,6 @@
           routeStartType = `shipper:${key}`;
           isRoutingArmed = true;
           lastInteractedOrderKey = null;
-          try {
-            localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
-          } catch (err) {}
-          if (els.routeStartSelect) {
-            els.routeStartSelect.value = routeStartType;
-          }
           if (routeOrderKeys.length > 0) {
             calculateAndDrawRoute();
             toggleRoutePanel(true);
@@ -3097,8 +2961,7 @@
       renderShipperStatus(shippers);
       renderShipperFilter(shippers);
       renderShippers(shippers);
-      if (typeof updateRouteStartOptions === "function") updateRouteStartOptions();
-      if (typeof calculateAndDrawRoute === "function" && routeStartType.startsWith("shipper:") && routeOrderKeys.length > 0) {
+      if (typeof calculateAndDrawRoute === "function" && routeStartType && routeStartType.startsWith("shipper:") && routeOrderKeys.length > 0) {
         calculateAndDrawRoute();
       }
 
