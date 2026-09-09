@@ -1368,15 +1368,24 @@
     const shipperMarkers = new Map();
 
     function focusShipper(shipper) {
-      const lat = toNumber(shipper.latitude ?? shipper.lat);
-      const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
-      if (lat === null || lng === null) return;
+      const key = getShipperKey(shipper);
+      const marker = shipperMarkers.get(key);
 
-      map.setView([lat, lng], SHIPPER_FOCUS_ZOOM, {
+      let targetLat = toNumber(shipper.latitude ?? shipper.lat);
+      let targetLng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
+
+      if (marker) {
+        const markerPos = marker.getLatLng();
+        targetLat = markerPos.lat;
+        targetLng = markerPos.lng;
+      }
+
+      if (targetLat === null || targetLng === null) return;
+
+      map.setView([targetLat, targetLng], SHIPPER_FOCUS_ZOOM, {
         animate: true
       });
 
-      const marker = shipperMarkers.get(getShipperKey(shipper));
       if (marker) {
         marker.openPopup();
       }
@@ -1737,7 +1746,7 @@
           icon,
           zIndexOffset: 2000
         })
-          .bindPopup(popup)
+          .bindPopup(popup, { autoPan: false })
           .addTo(shipperLayer);
 
         shipperMarkers.set(getShipperKey(shipper), marker);
