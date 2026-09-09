@@ -1438,16 +1438,32 @@
       iconAnchor: [13, 13]
     });
 
-    L.marker([RESTAURANT.lat, RESTAURANT.lng], {
+    const restaurantMarker = L.marker([RESTAURANT.lat, RESTAURANT.lng], {
       icon: restaurantIcon,
       zIndexOffset: 0
     })
       .bindPopup("<b>Thai Asia SushiBar</b><br>Leipziger Chaussee 147")
       .addTo(map);
 
+    restaurantMarker.on("click", () => {
+      routeStartType = "restaurant";
+      try {
+        localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
+      } catch (err) {}
+      if (els.routeStartSelect) {
+        els.routeStartSelect.value = "restaurant";
+      }
+      if (routeOrderKeys.length > 0) {
+        calculateAndDrawRoute();
+      }
+    });
+
     let refreshTimer = null;
     let refreshing = false;
 
+    const STATUS_FILTER_KEY = "thaiasia.statusFilter";
+    const SHOW_ORDERS_KEY = "thaiasia.showOrders";
+    const SHOW_SHIPPERS_KEY = "thaiasia.showShippers";
     const SHIPPER_VISIBILITY_KEY = "thaiasia.shipperVisibility";
 
     // Lưu trạng thái bật/tắt từng shipper.
@@ -1489,6 +1505,28 @@
       shipperSettingList: document.getElementById("shipperSettingList"),
       lastUpdate: document.getElementById("lastUpdate")
     };
+
+    // Khôi phục bộ lọc trạng thái và hiển thị đã lưu
+    const savedStatusFilter = localStorage.getItem(STATUS_FILTER_KEY);
+    if (savedStatusFilter && els.statusFilter.querySelector(`option[value="${savedStatusFilter}"]`)) {
+      els.statusFilter.value = savedStatusFilter;
+    } else {
+      els.statusFilter.value = "inprocess";
+    }
+
+    if (localStorage.getItem(SHOW_ORDERS_KEY) !== null) {
+      els.showOrders.checked = localStorage.getItem(SHOW_ORDERS_KEY) !== "0";
+      if (!els.showOrders.checked && map.hasLayer(orderLayer)) {
+        map.removeLayer(orderLayer);
+      }
+    }
+
+    if (localStorage.getItem(SHOW_SHIPPERS_KEY) !== null) {
+      els.showShippers.checked = localStorage.getItem(SHOW_SHIPPERS_KEY) !== "0";
+      if (!els.showShippers.checked && map.hasLayer(shipperLayer)) {
+        map.removeLayer(shipperLayer);
+      }
+    }
 
     function updateZoomDisplay() {
       els.currentZoom.textContent = String(map.getZoom());
@@ -1698,10 +1736,19 @@
       });
     }
 
-    els.statusFilter.addEventListener("change", refreshAll);
+    els.statusFilter.addEventListener("change", () => {
+      try {
+        localStorage.setItem(STATUS_FILTER_KEY, els.statusFilter.value);
+      } catch (err) {}
+      refreshAll();
+    });
 
     els.showOrders.addEventListener("change", () => {
-      if (els.showOrders.checked) {
+      const checked = els.showOrders.checked;
+      try {
+        localStorage.setItem(SHOW_ORDERS_KEY, checked ? "1" : "0");
+      } catch (err) {}
+      if (checked) {
         if (!map.hasLayer(orderLayer)) orderLayer.addTo(map);
       } else if (map.hasLayer(orderLayer)) {
         map.removeLayer(orderLayer);
@@ -1709,7 +1756,11 @@
     });
 
     els.showShippers.addEventListener("change", () => {
-      if (els.showShippers.checked) {
+      const checked = els.showShippers.checked;
+      try {
+        localStorage.setItem(SHOW_SHIPPERS_KEY, checked ? "1" : "0");
+      } catch (err) {}
+      if (checked) {
         if (!map.hasLayer(shipperLayer)) shipperLayer.addTo(map);
       } else if (map.hasLayer(shipperLayer)) {
         map.removeLayer(shipperLayer);
@@ -2055,7 +2106,19 @@
 
         marker.on("click", () => {
           stopFollowShipper();
-          focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
+          const inRoute = routeOrderKeys.includes(orderKey);
+          if (!inRoute) {
+            // Đơn chưa có trong lộ trình -> Nối nhanh vào tuyến, đóng popup để bản đồ thoáng
+            setTimeout(() => {
+              marker.closePopup();
+              map.closePopup();
+            }, 0);
+            toggleOrderInRoute(orderKey);
+          } else {
+            // Đơn đã có trong lộ trình -> Mở chi tiết đơn
+            focusOrderMarker(lat, lng, ORDER_FOCUS_ZOOM);
+            marker.openPopup();
+          }
         });
 
         marker.on("popupopen", () => {
@@ -2366,12 +2429,22 @@
                 className: "",
                 html: `<div class="waypoint-badge-marker">${idx + 1}</div>`,
                 iconSize: [22, 22],
-                iconAnchor: [11, 28]
+                iconAnchor: [11, 16]
               });
-              L.marker([lat, lng], {
+              const badgeMarker = L.marker([lat, lng], {
                 icon: badgeIcon,
                 zIndexOffset: 3000
               }).addTo(routeLayerGroup);
+
+              badgeMarker.on("click", () => {
+                const ordMarker = orderLayer.getLayers().find(m => {
+                  const pos = m.getLatLng();
+                  return Math.abs(pos.lat - lat) < 0.00001 && Math.abs(pos.lng - lng) < 0.00001;
+                });
+                if (ordMarker) {
+                  ordMarker.openPopup();
+                }
+              });
             }
           }
         });
@@ -2497,6 +2570,18 @@
     function focusShipper(shipper) {
       const key = getShipperKey(shipper);
       const marker = shipperMarkers.get(key);
+
+      // Đặt shipper này làm điểm xuất phát cho lộ trình
+      routeStartType = `shipper:${key}`;
+      try {
+        localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
+      } catch (err) {}
+      if (els.routeStartSelect) {
+        els.routeStartSelect.value = routeStartType;
+      }
+      if (routeOrderKeys.length > 0) {
+        calculateAndDrawRoute();
+      }
 
       // Nếu bấm lại vào chính shipper đang bám đuôi -> hủy bám đuôi
       if (activeFollowShipperKey === key) {
@@ -2899,6 +2984,20 @@
         })
           .bindPopup(popup, { autoPan: false })
           .addTo(shipperLayer);
+
+        marker.on("click", () => {
+          const key = getShipperKey(shipper);
+          routeStartType = `shipper:${key}`;
+          try {
+            localStorage.setItem(ROUTE_START_TYPE_KEY, routeStartType);
+          } catch (err) {}
+          if (els.routeStartSelect) {
+            els.routeStartSelect.value = routeStartType;
+          }
+          if (routeOrderKeys.length > 0) {
+            calculateAndDrawRoute();
+          }
+        });
 
         shipperMarkers.set(getShipperKey(shipper), marker);
       });
