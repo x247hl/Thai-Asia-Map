@@ -1,4 +1,6 @@
 @echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0update-github.ps1"
-echo.
-pause
+if %errorlevel% neq 0 (
+  echo.
+  pause
+)

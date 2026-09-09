@@ -66,3 +66,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Done. GitHub has been updated." -ForegroundColor Green
+Start-Sleep -Milliseconds 800

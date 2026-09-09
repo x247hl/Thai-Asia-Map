@@ -1030,13 +1030,14 @@
 
     /* Route Summary Box */
     .route-summary-box {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 10px;
-      padding: 9px 11px;
+      background: #fbfbfe;
+      border: 1px solid #e0e7ff;
+      border-radius: 12px;
+      padding: 11px 13px;
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.06);
     }
 
     .route-summary-box.hidden {
@@ -1047,8 +1048,8 @@
       display: flex;
       justify-content: space-around;
       text-align: center;
-      border-bottom: 1px dashed #bbf7d0;
-      padding-bottom: 6px;
+      border-bottom: 1px dashed #c7d2fe;
+      padding-bottom: 7px;
     }
 
     .route-summary-stat {
@@ -1059,23 +1060,24 @@
 
     .stat-label {
       font-size: 10px;
-      color: #166534;
-      font-weight: 600;
+      color: #6366f1;
+      font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .stat-val {
-      font-size: 14px;
-      color: #15803d;
+      font-size: 16px;
+      color: #7c3aed;
       font-weight: 800;
     }
 
     .route-legs-list {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 4px;
       font-size: 11px;
-      color: #166534;
+      color: #3730a3;
       line-height: 1.35;
     }
 
@@ -1112,12 +1114,12 @@
     }
 
     .route-action-btn.primary {
-      background: #0284c7;
+      background: #7c3aed;
       color: #fff;
     }
 
     .route-action-btn.primary:not(:disabled):hover {
-      background: #0369a1;
+      background: #6d28d9;
     }
 
     .route-action-btn.danger {
@@ -1135,9 +1137,9 @@
       width: 100%;
       height: 32px;
       margin-top: 8px;
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      color: #0284c7;
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      color: #7c3aed;
       border-radius: 8px;
       font-size: 12px;
       font-weight: 700;
@@ -1150,7 +1152,7 @@
     }
 
     .btn-toggle-route:hover {
-      background: #e0f2fe;
+      background: #ede9fe;
     }
 
     .btn-toggle-route.in-route {
@@ -1163,21 +1165,34 @@
       background: #fecaca;
     }
 
-    /* Numbered Waypoint Badge Icon on Map */
+    /* Numbered Waypoint Badge Icon on Map (3D High-Contrast Neon) */
     .waypoint-badge-marker {
-      width: 22px;
-      height: 22px;
-      background: #0284c7;
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
       color: #fff;
-      border: 2px solid #fff;
+      border: 2.5px solid #ffffff;
       border-radius: 50%;
-      box-shadow: 0 2px 7px rgba(0,0,0,.35);
-      font-size: 11px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, .4), 0 0 0 1px rgba(109, 40, 217, 0.4);
+      font-size: 12px;
       font-weight: 800;
       display: flex;
       align-items: center;
       justify-content: center;
       line-height: 1;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .waypoint-badge-marker:hover {
+      transform: scale(1.15);
+    }
+
+    /* Directional Route Arrow along Polyline */
+    .route-arrow-marker {
+      pointer-events: none !important;
+      background: transparent !important;
+      border: none !important;
     }
 
     @media (min-width: 769px) {
@@ -2335,21 +2350,58 @@
 
         routePolylineOutline = L.polyline(latLngs, {
           color: "#ffffff",
-          weight: 8,
+          weight: 9,
           opacity: 0.95,
           lineJoin: "round",
           lineCap: "round"
         }).addTo(routeLayerGroup);
 
         routePolylineInner = L.polyline(latLngs, {
-          color: "#0284c7",
-          weight: 5,
-          opacity: 0.95,
+          color: "#7c3aed",
+          weight: 5.5,
+          opacity: 0.98,
           lineJoin: "round",
           lineCap: "round"
         }).addTo(routeLayerGroup);
 
-        // Add numbered waypoint badges on map
+        // Add Directional Arrows along the polyline route (Phương án 2)
+        let accumulatedDist = 0;
+        const ARROW_INTERVAL_METERS = 400; // Mỗi ~400m đặt 1 mũi tên chỉ hướng
+
+        for (let i = 0; i < latLngs.length - 1; i++) {
+          const p1 = latLngs[i];
+          const p2 = latLngs[i + 1];
+          const segDist = calculateDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
+          accumulatedDist += segDist;
+
+          if (accumulatedDist >= ARROW_INTERVAL_METERS && segDist > 8) {
+            accumulatedDist = 0;
+            const bearing = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
+            const midLat = (p1[0] + p2[0]) / 2;
+            const midLng = (p1[1] + p2[1]) / 2;
+
+            const arrowIcon = L.divIcon({
+              className: "route-arrow-marker",
+              html: `
+                <div style="transform: rotate(${Math.round(bearing)}deg); display: flex; align-items: center; justify-content: center; width: 12px; height: 12px;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#ffffff" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));">
+                    <path d="M12 2L22 22L12 17L2 22L12 2Z"/>
+                  </svg>
+                </div>
+              `,
+              iconSize: [12, 12],
+              iconAnchor: [6, 6]
+            });
+
+            L.marker([midLat, midLng], {
+              icon: arrowIcon,
+              zIndexOffset: 2500,
+              interactive: false
+            }).addTo(routeLayerGroup);
+          }
+        }
+
+        // Add 3D High-Contrast Neon numbered waypoint badges on map (Phương án 5)
         routeOrderKeys.forEach((key, idx) => {
           const order = lastOrders.find(o => getOrderKey(o) === key);
           if (order) {
@@ -2359,8 +2411,8 @@
               const badgeIcon = L.divIcon({
                 className: "",
                 html: `<div class="waypoint-badge-marker">${idx + 1}</div>`,
-                iconSize: [22, 22],
-                iconAnchor: [11, 16]
+                iconSize: [24, 24],
+                iconAnchor: [12, 17]
               });
               const badgeMarker = L.marker([lat, lng], {
                 icon: badgeIcon,
