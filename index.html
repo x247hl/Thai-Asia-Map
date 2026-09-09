@@ -1833,12 +1833,13 @@
         shipperMarkers.set(getShipperKey(shipper), marker);
       });
 
-      // Nếu đang bật chế độ bám đuôi, tự động cuộn bản đồ theo vị trí mới nhất của xe
+      // Nếu đang bật chế độ bám đuôi, tự động cuộn bản đồ theo vị trí mới nhất của xe và giữ mở bảng thông tin
       if (activeFollowShipperKey) {
         const activeMarker = shipperMarkers.get(activeFollowShipperKey);
         if (activeMarker) {
           const latLng = activeMarker.getLatLng();
           map.panTo(latLng, { animate: true, duration: 1 });
+          activeMarker.openPopup();
         }
       }
 
