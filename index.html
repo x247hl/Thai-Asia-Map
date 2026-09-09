@@ -1183,6 +1183,17 @@
       cursor: not-allowed;
     }
 
+    .route-mini-action-btn.optimize {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    .route-mini-action-btn.optimize:not(:disabled):hover {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
     .route-mini-action-btn.primary {
       background: #ede9fe;
       color: #6d28d9;
@@ -1211,6 +1222,33 @@
 
     .route-mini-action-btn.danger:not(:disabled):hover {
       background: #fecaca;
+    }
+
+    /* Floating Toast Feedback */
+    .map-toast {
+      position: fixed;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+      z-index: 4000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      white-space: nowrap;
+    }
+
+    .map-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     /* Popup Button toggle route */
@@ -1390,6 +1428,7 @@
         </label>
 
         <div class="route-top-actions">
+          <button id="routeOptimizeBtn" class="route-mini-action-btn optimize" type="button" title="Gợi ý & tự động tối ưu thứ tự giao" disabled>✨ Tối ưu</button>
           <button id="routeReverseBtn" class="route-mini-action-btn secondary" type="button" title="Đảo ngược thứ tự giao đơn" disabled>⇄ Đảo</button>
           <button id="routeFitViewBtn" class="route-mini-action-btn primary" type="button" title="Xem toàn cảnh lộ trình" disabled>🔍 Toàn cảnh</button>
           <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình" disabled>🗑️ Xóa</button>
@@ -1411,6 +1450,8 @@
       </div>
     </div>
   </div>
+
+  <div id="mapToast" class="map-toast"></div>
 
   <div class="map-bottom-controls" aria-label="Điều khiển bản đồ">
     <button id="reloadButton" class="reload-button" type="button" title="Tải lại trang">↻</button>
@@ -1464,7 +1505,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v47</span>
+      <span style="font-weight: 700; color: #7c3aed;">v49</span>
     </div>
   </div>
 
@@ -1648,9 +1689,11 @@
       routeTotalDist: document.getElementById("routeTotalDist"),
       routeTotalTime: document.getElementById("routeTotalTime"),
       routeLegsList: document.getElementById("routeLegsList"),
-      routeFitViewBtn: document.getElementById("routeFitViewBtn"),
+      routeOptimizeBtn: document.getElementById("routeOptimizeBtn"),
       routeReverseBtn: document.getElementById("routeReverseBtn"),
+      routeFitViewBtn: document.getElementById("routeFitViewBtn"),
       routeClearBtn: document.getElementById("routeClearBtn"),
+      mapToast: document.getElementById("mapToast"),
       statusFilter: document.getElementById("statusFilter"),
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
@@ -1875,6 +1918,14 @@
         } catch (err) { }
         if (typeof calculateAndDrawRoute === "function") {
           calculateAndDrawRoute();
+        }
+      });
+    }
+
+    if (els.routeOptimizeBtn) {
+      els.routeOptimizeBtn.addEventListener("click", () => {
+        if (typeof optimizeRouteOrders === "function") {
+          optimizeRouteOrders();
         }
       });
     }
@@ -2257,9 +2308,6 @@
             ${noteHtml}
             ${renderOrderItems(order.items)}
             <div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>
-            <button type="button" class="btn-toggle-route ${isInRoute ? 'in-route' : ''}" data-order-key="${escapeHtml(orderKey)}" onclick="toggleOrderInRoute('${escapeHtml(orderKey)}')">
-              ${routeBtnText}
-            </button>
           </div>
         `;
 
@@ -2365,6 +2413,9 @@
       if (els.routeStopCount) {
         els.routeStopCount.textContent = `${count} đơn`;
       }
+      if (els.routeOptimizeBtn) {
+        els.routeOptimizeBtn.disabled = count < 2;
+      }
       if (els.routeReverseBtn) {
         els.routeReverseBtn.disabled = count < 2;
       }
@@ -2396,6 +2447,163 @@
         els.routeReturnToShop.checked = routeReturnToShop;
       }
     }
+
+    let toastTimer = null;
+    function showToast(message, duration = 2800) {
+      if (!els.mapToast) return;
+      els.mapToast.textContent = message;
+      els.mapToast.classList.add("show");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        if (els.mapToast) els.mapToast.classList.remove("show");
+      }, duration);
+    }
+
+    function parseOrderSchedule(order) {
+      if (!order) return { isScheduled: false, targetMinutesFromNow: 0 };
+      const rawTime = String(order.time || "").trim().toLowerCase();
+      if (!rawTime || rawTime.includes("schnell") || rawTime.includes("asap") || rawTime.includes("ngay") || rawTime.includes("mög")) {
+        return { isScheduled: false, targetMinutesFromNow: 0 };
+      }
+
+      const match = rawTime.match(/(\d{1,2}):(\d{2})/);
+      if (!match) return { isScheduled: false, targetMinutesFromNow: 0 };
+
+      const h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+        return { isScheduled: false, targetMinutesFromNow: 0 };
+      }
+
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(h, m, 0, 0);
+
+      let diffMin = (target.getTime() - now.getTime()) / 60000;
+      if (diffMin < -600) {
+        target.setDate(target.getDate() + 1);
+        diffMin = (target.getTime() - now.getTime()) / 60000;
+      }
+
+      return {
+        isScheduled: true,
+        targetMinutesFromNow: diffMin
+      };
+    }
+
+    function getOrderWaitTimeMinutes(order) {
+      if (!order || !order.created_at) return 0;
+      const created = new Date(order.created_at);
+      if (Number.isNaN(created.getTime())) return 0;
+      return Math.max(0, (Date.now() - created.getTime()) / 60000);
+    }
+
+    function getPermutations(arr) {
+      if (!Array.isArray(arr) || arr.length <= 1) return [arr];
+      if (arr.length === 2) return [arr, [arr[1], arr[0]]];
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        const current = arr[i];
+        const remaining = arr.slice(0, i).concat(arr.slice(i + 1));
+        const subPerms = getPermutations(remaining);
+        for (let j = 0; j < subPerms.length; j++) {
+          result.push([current].concat(subPerms[j]));
+        }
+      }
+      return result;
+    }
+
+    function evaluateRouteOrderPermutation(perm) {
+      let startLat = RESTAURANT.lat;
+      let startLng = RESTAURANT.lng;
+      if (routeStartType && routeStartType.startsWith("shipper:")) {
+        const shipperKey = routeStartType.replace("shipper:", "");
+        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+        const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
+        const sLng = toNumber(shipper?.longitude ?? shipper?.lng ?? shipper?.lon);
+        if (sLat !== null && sLng !== null) {
+          startLat = sLat;
+          startLng = sLng;
+        }
+      }
+
+      let currentLat = startLat;
+      let currentLng = startLng;
+      let totalTravelMin = 0;
+      let totalPenalty = 0;
+
+      for (let i = 0; i < perm.length; i++) {
+        const key = perm[i];
+        const order = lastOrders.find(o => getOrderKey(o) === key);
+        if (!order) continue;
+
+        const oLat = toNumber(order.latitude);
+        const oLng = toNumber(order.longitude);
+        if (oLat === null || oLng === null) continue;
+
+        const straightDistMeters = calculateDistanceMeters(currentLat, currentLng, oLat, oLng);
+        const legTravelMin = (straightDistMeters * 1.35) / 500;
+        totalTravelMin += legTravelMin;
+
+        const arrivalFromNow = totalTravelMin + i * 2.5;
+
+        const schedule = parseOrderSchedule(order);
+        if (schedule.isScheduled) {
+          const targetMin = schedule.targetMinutesFromNow;
+          if (arrivalFromNow < targetMin) {
+            totalPenalty += (targetMin - arrivalFromNow) * 0.4;
+          } else if (arrivalFromNow <= targetMin + 15) {
+            totalPenalty += 0;
+          } else {
+            const lateMin = arrivalFromNow - (targetMin + 15);
+            totalPenalty += Math.pow(lateMin, 2) * 4;
+          }
+        } else {
+          const minsWaiting = getOrderWaitTimeMinutes(order);
+          const totalWaitAtDelivery = minsWaiting + arrivalFromNow;
+
+          if (totalWaitAtDelivery > 28) {
+            totalPenalty += Math.pow(totalWaitAtDelivery - 28, 1.6) * 1.6;
+          }
+        }
+
+        currentLat = oLat;
+        currentLng = oLng;
+      }
+
+      if (routeReturnToShop) {
+        const distBack = calculateDistanceMeters(currentLat, currentLng, RESTAURANT.lat, RESTAURANT.lng);
+        totalTravelMin += (distBack * 1.35) / 500;
+      }
+
+      return (totalTravelMin * 1.25) + totalPenalty;
+    }
+
+    window.optimizeRouteOrders = function () {
+      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
+
+      const perms = getPermutations(routeOrderKeys);
+      let bestPerm = routeOrderKeys;
+      let minCost = Infinity;
+
+      for (let i = 0; i < perms.length; i++) {
+        const cost = evaluateRouteOrderPermutation(perms[i]);
+        if (cost < minCost) {
+          minCost = cost;
+          bestPerm = perms[i];
+        }
+      }
+
+      const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
+      if (isSame) {
+        showToast("Lộ trình hiện tại đã tối ưu nhất! 👍");
+      } else {
+        routeOrderKeys = bestPerm;
+        renderRoutePanelUi();
+        calculateAndDrawRoute();
+        showToast("✨ Đã tối ưu thứ tự lộ trình!");
+      }
+    };
 
     window.reverseRouteOrders = function () {
       if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
