@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="vi">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -28,12 +29,11 @@
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
 
 
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <style>
-    html, body {
+    html,
+    body {
       width: 100%;
       height: 100%;
       margin: 0;
@@ -42,7 +42,10 @@
       background: #f3f3f3;
     }
 
-    #map { width: 100%; height: 100%; }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
 
     .auth-overlay {
       position: fixed;
@@ -65,7 +68,7 @@
       background: #fff;
       border-radius: 14px;
       padding: 20px;
-      box-shadow: 0 8px 28px rgba(15,23,42,.18);
+      box-shadow: 0 8px 28px rgba(15, 23, 42, .18);
       box-sizing: border-box;
     }
 
@@ -130,10 +133,10 @@
     }
 
     .summary-pill {
-      background: rgba(255,255,255,.96);
+      background: rgba(255, 255, 255, .96);
       padding: 8px 10px;
       border-radius: 12px;
-      box-shadow: 0 3px 14px rgba(0,0,0,.18);
+      box-shadow: 0 3px 14px rgba(0, 0, 0, .18);
       font-size: 12px;
       white-space: nowrap;
     }
@@ -165,10 +168,10 @@
       max-height: min(42vh, 260px);
       overflow-y: auto;
       overflow-x: hidden;
-      background: rgba(255,255,255,.96);
+      background: rgba(255, 255, 255, .96);
       border-radius: 12px;
       padding: 8px 10px;
-      box-shadow: 0 3px 14px rgba(0,0,0,.18);
+      box-shadow: 0 3px 14px rgba(0, 0, 0, .18);
       box-sizing: border-box;
       pointer-events: auto;
     }
@@ -186,7 +189,7 @@
       padding: 0;
       font-size: 24px;
       font-weight: 700;
-      box-shadow: 0 3px 14px rgba(0,0,0,.22);
+      box-shadow: 0 3px 14px rgba(0, 0, 0, .22);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -200,15 +203,17 @@
       bottom: calc(64px + env(safe-area-inset-bottom));
       z-index: 1100;
       width: min(285px, calc(100vw - 24px));
-      background: rgba(255,255,255,.98);
+      background: rgba(255, 255, 255, .98);
       border-radius: 16px;
       padding: 14px;
-      box-shadow: 0 5px 22px rgba(0,0,0,.23);
+      box-shadow: 0 5px 22px rgba(0, 0, 0, .23);
       display: none;
       box-sizing: border-box;
     }
 
-    .filter-panel.open { display: block; }
+    .filter-panel.open {
+      display: block;
+    }
 
     .filter-title {
       font-size: 16px;
@@ -285,11 +290,11 @@
       min-width: 52px;
       min-height: 40px;
       padding: 5px 7px;
-      border: 2px solid rgba(255,255,255,.95);
+      border: 2px solid rgba(255, 255, 255, .95);
       border-radius: 11px;
       background: var(--order-color);
       color: #fff;
-      box-shadow: 0 2px 7px rgba(0,0,0,.22);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, .22);
       box-sizing: border-box;
       transform: translateX(-50%);
     }
@@ -302,8 +307,8 @@
       height: 0;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
-      border-top: 8px solid rgba(255,255,255,.95);
-      filter: drop-shadow(0 1px 1px rgba(0,0,0,.16));
+      border-top: 8px solid rgba(255, 255, 255, .95);
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .16));
       transform: translateX(-50%);
     }
 
@@ -325,19 +330,33 @@
       top: 46px;
       width: 12px;
       height: 12px;
-      border: 2px solid rgba(255,255,255,.95);
+      border: 2px solid rgba(255, 255, 255, .95);
       border-radius: 50%;
       background: var(--order-color);
-      box-shadow: 0 1px 5px rgba(0,0,0,.24);
+      box-shadow: 0 1px 5px rgba(0, 0, 0, .24);
       box-sizing: border-box;
       transform: translateX(-50%);
     }
 
-    .order-new { --order-color: #FF0000; }
-    .order-inprocess { --order-color: #2f80ed; }
-    .order-inprocess-scheduled { --order-color: #6a0dad; }
-    .order-complete { --order-color: #179b4c; }
-    .order-cancel { --order-color: #777; }
+    .order-new {
+      --order-color: #FF0000;
+    }
+
+    .order-inprocess {
+      --order-color: #2f80ed;
+    }
+
+    .order-inprocess-scheduled {
+      --order-color: #6a0dad;
+    }
+
+    .order-complete {
+      --order-color: #179b4c;
+    }
+
+    .order-cancel {
+      --order-color: #777;
+    }
 
     .restaurant-icon {
       width: 26px;
@@ -349,7 +368,7 @@
       align-items: center;
       justify-content: center;
       font-size: 15px;
-      box-shadow: 0 2px 7px rgba(0,0,0,.32);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, .32);
       box-sizing: border-box;
     }
 
@@ -399,7 +418,7 @@
     }
 
     .shipper-focus-row:active {
-      background: rgba(242,118,24,.12);
+      background: rgba(242, 118, 24, .12);
     }
 
     .shipper-age {
@@ -430,9 +449,9 @@
       width: 28px;
       height: 28px;
       border: 1px solid #cfcfcf;
-      background: rgba(255,255,255,.97);
+      background: rgba(255, 255, 255, .97);
       border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
       color: #222;
       cursor: pointer;
       font-size: 16px;
@@ -457,17 +476,22 @@
     }
 
     @keyframes spinReload {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .shipper-icon {
       width: 34px;
       height: 34px;
-      border: 2px solid rgba(255,255,255,.95);
+      border: 2px solid rgba(255, 255, 255, .95);
       border-radius: 50%;
       background: #f27618;
-      box-shadow: 0 2px 7px rgba(0,0,0,.24);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, .24);
       box-sizing: border-box;
       display: flex;
       align-items: center;
@@ -481,7 +505,9 @@
       margin-bottom: 6px;
     }
 
-    .popup-line { margin: 2px 0; }
+    .popup-line {
+      margin: 2px 0;
+    }
 
     .order-popup {
       max-width: 360px;
@@ -565,7 +591,8 @@
   <div id="authOverlay" class="auth-overlay">
     <form id="authForm" class="auth-card">
       <div class="auth-title">Thai Asia Map</div>
-      <input id="authPassword" class="auth-input" type="password" placeholder="Mật khẩu" autocomplete="current-password" />
+      <input id="authPassword" class="auth-input" type="password" placeholder="Mật khẩu"
+        autocomplete="current-password" />
       <button class="auth-button" type="submit">Vào app</button>
       <div id="authError" class="auth-error">Sai mật khẩu</div>
     </form>
@@ -639,13 +666,12 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <script>
     const API_BASE = "https://api.thaiasiasushibar.de/api";
     // Đổi mật khẩu tại đây. Sau khi đổi và push/deploy, thiết bị cũ sẽ phải nhập lại.
-    const APP_PASSWORD = "thaiasia";
+    const APP_PASSWORD = "123456";
     const AUTH_STORAGE_KEY = "thaiasia.map.authToken";
 
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
@@ -1409,4 +1435,5 @@
   </script>
 
 </body>
+
 </html>
