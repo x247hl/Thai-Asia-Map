@@ -202,22 +202,81 @@
     }
 
     .order-marker {
-      min-width: 52px;
-      padding: 5px 7px;
-      border-radius: 10px;
+      --order-color: #f27618;
+      position: relative;
+      width: 64px;
+      height: 58px;
       color: #fff;
       text-align: center;
       font-weight: 700;
       font-size: 12px;
       line-height: 15px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.25);
-      border: 2px solid rgba(255,255,255,.9);
     }
 
-    .order-new { background: #d83b3b; }
-    .order-inprocess { background: #f27618; }
-    .order-complete { background: #179b4c; }
-    .order-cancel { background: #777; }
+    .order-marker-panel {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      min-width: 52px;
+      min-height: 40px;
+      padding: 5px 7px;
+      border: 2px solid rgba(255,255,255,.95);
+      border-radius: 11px;
+      background: var(--order-color);
+      color: #fff;
+      box-shadow: 0 2px 7px rgba(0,0,0,.22);
+      box-sizing: border-box;
+      transform: translateX(-50%);
+    }
+
+    .order-marker-pointer {
+      position: absolute;
+      left: 50%;
+      top: 39px;
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 8px solid var(--order-color);
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.2));
+      transform: translateX(-50%);
+    }
+
+    .order-marker-pointer::before {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: -10px;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 10px solid rgba(255,255,255,.95);
+      z-index: -1;
+    }
+
+    .order-marker-dot {
+      position: absolute;
+      left: 50%;
+      top: 46px;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,.95);
+      border-radius: 50%;
+      background: var(--order-color);
+      box-shadow: 0 1px 5px rgba(0,0,0,.24);
+      box-sizing: border-box;
+      transform: translateX(-50%);
+    }
+
+    .order-new { --order-color: #d83b3b; }
+    .order-inprocess { --order-color: #f27618; }
+    .order-complete { --order-color: #179b4c; }
+    .order-cancel { --order-color: #777; }
+
+    .order-marker-panel {
+      text-align: center;
+    }
 
     .restaurant-icon {
       width: 26px;
@@ -387,7 +446,7 @@
   <button id="filterButton" class="filter-button" type="button" title="Bộ lọc" aria-label="Bộ lọc">⚙</button>
 
   <div id="filterPanel" class="filter-panel">
-    <div class="filter-title">Settingggg</div>
+    <div class="filter-title">Setting</div>
 
     <div class="filter-zoom-row">
       <span>Zoom</span>
@@ -686,12 +745,16 @@
           className: "",
           html: `
             <div class="order-marker ${orderClass(status)}">
-              #${escapeHtml(code)}
-              ${time ? `<br>${escapeHtml(time)}` : ""}
+              <div class="order-marker-panel">
+                #${escapeHtml(code)}
+                ${time ? `<br>${escapeHtml(time)}` : ""}
+              </div>
+              <div class="order-marker-pointer"></div>
+              <div class="order-marker-dot"></div>
             </div>
           `,
-          iconSize: [60, 44],
-          iconAnchor: [30, 22]
+          iconSize: [64, 58],
+          iconAnchor: [32, 52]
         });
 
         const fullName = `${order.first_name ?? ""} ${order.last_name ?? ""}`.trim();
