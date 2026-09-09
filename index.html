@@ -671,7 +671,7 @@
   <script>
     const API_BASE = "https://api.thaiasiasushibar.de/api";
     // Đổi mật khẩu tại đây. Sau khi đổi và push/deploy, thiết bị cũ sẽ phải nhập lại.
-    const APP_PASSWORD = "12345";
+    let APP_PASSWORD = "123456";
     const AUTH_STORAGE_KEY = "thaiasia.map.authToken";
 
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
@@ -795,6 +795,22 @@
       }
     }
 
+    function lockApp(reasonMessage) {
+      appUnlocked = false;
+      stopPolling();
+      orderLayer.clearLayers();
+      shipperLayer.clearLayers();
+      els.authOverlay.classList.remove("hidden");
+      if (reasonMessage) {
+        els.authError.textContent = reasonMessage;
+        els.authError.classList.add("show");
+      } else {
+        els.authError.classList.remove("show");
+      }
+      els.authPassword.value = "";
+      setTimeout(() => els.authPassword.focus(), 0);
+    }
+
     function unlockApp() {
       appUnlocked = true;
       els.authOverlay.classList.add("hidden");
@@ -804,6 +820,51 @@
         map.invalidateSize();
         startPolling();
       }, 0);
+    }
+
+    async function syncLatestPassword() {
+      try {
+        const res = await fetch(`index.html?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" }
+        });
+        if (!res.ok) return true;
+        const text = await res.text();
+        const match = text.match(/(?:const|let)\s+APP_PASSWORD\s*=\s*["']([^"']+)["']/);
+        if (match && match[1]) {
+          const serverPassword = match[1];
+          if (serverPassword !== APP_PASSWORD) {
+            APP_PASSWORD = serverPassword;
+            if (!hasSavedAccess()) {
+              lockApp("Mật khẩu đã được thay đổi. Vui lòng nhập mật khẩu mới.");
+              return false;
+            }
+          }
+        }
+      } catch (err) {
+        // Bỏ qua lỗi kết nối khi offline
+      }
+      return true;
+    }
+
+    async function handleAppResume() {
+      if (document.hidden) return;
+
+      if (!hasSavedAccess()) {
+        lockApp();
+        return;
+      }
+
+      const isStillValid = await syncLatestPassword();
+      if (!isStillValid || !hasSavedAccess()) {
+        return;
+      }
+
+      if (!appUnlocked) {
+        unlockApp();
+      } else {
+        startPolling({ resetView: true });
+      }
     }
 
     els.authForm.addEventListener("submit", event => {
@@ -819,6 +880,7 @@
         return;
       }
 
+      els.authError.textContent = "Sai mật khẩu";
       els.authError.classList.add("show");
       els.authPassword.select();
     });
@@ -1362,7 +1424,13 @@
 
 
     async function refreshAll() {
-      if (refreshing) return;
+      if (refreshing || !appUnlocked) return;
+
+      const isStillValid = await syncLatestPassword();
+      if (!isStillValid || !hasSavedAccess()) {
+        return;
+      }
+
       refreshing = true;
       els.reloadButton.classList.add("loading");
       els.reloadButton.disabled = true;
@@ -1406,22 +1474,31 @@
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         stopPolling();
-      } else if (appUnlocked) {
-        startPolling({ resetView: true });
+      } else {
+        handleAppResume();
       }
     });
 
     window.addEventListener("pageshow", event => {
-      if (event.persisted && !document.hidden && appUnlocked) {
-        startPolling({ resetView: true });
+      if (!document.hidden) {
+        handleAppResume();
       }
     });
 
-    if (hasSavedAccess()) {
-      unlockApp();
-    } else {
-      setTimeout(() => els.authPassword.focus(), 0);
-    }
+    window.addEventListener("focus", () => {
+      if (!document.hidden) {
+        handleAppResume();
+      }
+    });
+
+    (async () => {
+      await syncLatestPassword();
+      if (hasSavedAccess()) {
+        unlockApp();
+      } else {
+        lockApp();
+      }
+    })();
   </script>
 
   <script>
