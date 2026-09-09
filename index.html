@@ -551,6 +551,10 @@
       zoomControl: false
     }).setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
 
+    function resetMapToRestaurant() {
+      map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
+    }
+
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors"
@@ -1115,8 +1119,11 @@
       }
     }
 
-    function startPolling() {
+    function startPolling(options = {}) {
       stopPolling();
+      if (options.resetView) {
+        resetMapToRestaurant();
+      }
       refreshAll();
       refreshTimer = setInterval(refreshAll, REFRESH_MS);
     }
@@ -1132,13 +1139,13 @@
       if (document.hidden) {
         stopPolling();
       } else {
-        startPolling();
+        startPolling({ resetView: true });
       }
     });
 
     window.addEventListener("pageshow", event => {
       if (event.persisted && !document.hidden) {
-        startPolling();
+        startPolling({ resetView: true });
       }
     });
 
