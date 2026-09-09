@@ -338,11 +338,11 @@
     }
 
     .order-inprocess {
-      --order-color: #2f80ed;
+      --order-color: #0169f0;
     }
 
     .order-inprocess-scheduled {
-      --order-color: #6a0dad;
+      --order-color: #7e04d5;
     }
 
     .order-complete {
@@ -1016,7 +1016,7 @@
       baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
       try {
         localStorage.setItem("thaiasia.showTraffic", enabled ? "1" : "0");
-      } catch (err) {}
+      } catch (err) { }
     });
 
     function escapeHtml(value) {
@@ -1554,7 +1554,8 @@
       const key = getShipperKey(shipper);
       const straightDist = calculateDistanceMeters(lat, lng, RESTAURANT.lat, RESTAURANT.lng);
 
-      if (straightDist < 60) {
+      // Khuôn viên trung tâm thương mại HEP (bãi đỗ xe, Kaufland, lối vào): bán kính ~220m
+      if (straightDist <= 220) {
         return {
           atRestaurant: true,
           distanceMeters: straightDist,
@@ -1604,6 +1605,15 @@
         routeData = {
           distanceMeters: estDistance,
           durationSeconds: Math.max(30, estDistance / estSpeedMs)
+        };
+      }
+
+      // Lọc thông minh khi xe đã ở cự ly gần quán (< 450m) để loại bỏ các khúc cua vòng vo do dải phân cách/đường nội bộ
+      if (straightDist < 450 && routeData.distanceMeters > straightDist * 1.8) {
+        const localDist = straightDist * 1.25;
+        routeData = {
+          distanceMeters: localDist,
+          durationSeconds: Math.max(25, localDist / ((25 * 1000) / 3600))
         };
       }
 
