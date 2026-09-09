@@ -784,14 +784,18 @@
 
     function getGoogleMapTileUrl(withTraffic) {
       const lyr = withTraffic ? "m,traffic" : "m";
-      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}`;
+      const scale = (typeof window !== "undefined" && window.devicePixelRatio && window.devicePixelRatio >= 1.5) ? 2 : 1;
+      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}&scale=${scale}`;
     }
 
     const isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
 
     const baseTileLayer = L.tileLayer(getGoogleMapTileUrl(isTrafficEnabled), {
       maxZoom: 20,
-      subdomains: ["mt0", "mt1", "mt2", "mt3"]
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      tileSize: 256,
+      updateWhenZooming: false,
+      updateWhenIdle: true
     }).addTo(map);
 
     const orderLayer = L.layerGroup().addTo(map);
