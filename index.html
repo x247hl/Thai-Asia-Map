@@ -78,6 +78,21 @@
       margin-right: 3px;
     }
 
+    .order-summary {
+      color: #111;
+      transition: background-color .15s ease, color .15s ease;
+    }
+
+    .order-summary.has-orders {
+      background: #FF2400;
+      color: #fff;
+    }
+
+    .order-summary.no-orders {
+      background: #00FF00;
+      color: #111;
+    }
+
     .top-shipper-list {
       width: max-content;
       min-width: 0;
@@ -101,11 +116,17 @@
       border: 0;
       background: #fff;
       border-radius: 999px;
-      padding: 11px 14px;
-      font-size: 14px;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      font-size: 24px;
       font-weight: 700;
       box-shadow: 0 3px 14px rgba(0,0,0,.22);
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
     }
 
     .filter-panel {
@@ -128,6 +149,20 @@
       font-size: 16px;
       font-weight: 700;
       margin-bottom: 12px;
+    }
+
+    .filter-zoom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .filter-zoom-row b {
+      font-size: 16px;
     }
 
     .field-label {
@@ -279,6 +314,17 @@
       font-size: 17px;
     }
 
+    .map-bottom-controls .reload-button.loading {
+      animation: spinReload .8s linear infinite;
+      background: #eef6ff;
+      border-color: #6aa8ff;
+    }
+
+    @keyframes spinReload {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
     .shipper-icon {
       font-size: 25px;
       line-height: 25px;
@@ -320,8 +366,7 @@
 
   <div class="top-panel">
     <div class="summary">
-      <div class="summary-pill">Zoom <b id="currentZoom">0</b></div>
-      <div class="summary-pill"><b id="orderCount">0</b> đơn</div>
+      <div id="orderSummary" class="summary-pill order-summary no-orders"><b id="orderCount">0</b> đơn</div>
       <div class="summary-pill"><b id="shipperCount">0</b> shipper</div>
     </div>
 
@@ -339,10 +384,15 @@
     <button id="reloadButton" class="reload-button" type="button" title="Tải lại dữ liệu">↻</button>
   </div>
 
-  <button id="filterButton" class="filter-button" type="button">⚙ Bộ lọc</button>
+  <button id="filterButton" class="filter-button" type="button" title="Bộ lọc" aria-label="Bộ lọc">⚙</button>
 
   <div id="filterPanel" class="filter-panel">
     <div class="filter-title">Bộ lọc bản đồ</div>
+
+    <div class="filter-zoom-row">
+      <span>Zoom</span>
+      <b id="currentZoom">0</b>
+    </div>
 
     <div class="field-label">Trạng thái đơn</div>
     <select id="statusFilter">
@@ -452,6 +502,7 @@
       showShippers: document.getElementById("showShippers"),
       homeButton: document.getElementById("homeButton"),
       reloadButton: document.getElementById("reloadButton"),
+      orderSummary: document.getElementById("orderSummary"),
       orderCount: document.getElementById("orderCount"),
       shipperCount: document.getElementById("shipperCount"),
       currentZoom: document.getElementById("currentZoom"),
@@ -667,6 +718,8 @@
       });
 
       els.orderCount.textContent = String(orders.length);
+      els.orderSummary.classList.toggle("has-orders", orders.length >= 1);
+      els.orderSummary.classList.toggle("no-orders", orders.length === 0);
     }
 
     function getShipperKey(shipper) {
@@ -787,6 +840,9 @@
     async function refreshAll() {
       if (refreshing) return;
       refreshing = true;
+      els.reloadButton.classList.add("loading");
+      els.reloadButton.disabled = true;
+      els.lastUpdate.textContent = "Đang tải...";
 
       try {
         await Promise.all([loadOrders(), loadShippers()]);
@@ -802,6 +858,8 @@
         els.lastUpdate.textContent = "Lỗi";
       } finally {
         refreshing = false;
+        els.reloadButton.classList.remove("loading");
+        els.reloadButton.disabled = false;
       }
     }
 
