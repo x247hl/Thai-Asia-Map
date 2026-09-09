@@ -485,6 +485,30 @@
       }
     }
 
+    .shipper-car-marker {
+      width: 32px;
+      height: 52px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .shipper-car-body {
+      width: 28px;
+      height: 48px;
+      transform-origin: center center;
+      transition: transform .6s cubic-bezier(0.25, 1, 0.5, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .38));
+    }
+
+    .shipper-car-offline {
+      filter: grayscale(1) opacity(0.55) drop-shadow(0 2px 4px rgba(0, 0, 0, .25));
+    }
+
     .shipper-icon {
       width: 34px;
       height: 34px;
@@ -1297,7 +1321,7 @@
         });
 
         const icon = document.createElement("span");
-        icon.textContent = online ? "🛵" : "⚪";
+        icon.textContent = online ? "🚗" : "⚪";
 
         const nameEl = document.createElement("span");
         nameEl.className = "name";
@@ -1348,7 +1372,7 @@
         });
 
         const icon = document.createElement("span");
-        icon.textContent = online ? "🛵" : "⚪";
+        icon.textContent = online ? "🚗" : "⚪";
 
         const nameEl = document.createElement("span");
         nameEl.className = "name";
@@ -1366,6 +1390,105 @@
       });
     }
 
+    const shipperPrevPositions = new Map();
+
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      const toRad = deg => (deg * Math.PI) / 180;
+      const toDeg = rad => (rad * 180) / Math.PI;
+
+      const φ1 = toRad(lat1);
+      const φ2 = toRad(lat2);
+      const Δλ = toRad(lon2 - lon1);
+
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x =
+        Math.cos(φ1) * Math.sin(φ2) -
+        Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+      const θ = Math.atan2(y, x);
+      return (toDeg(θ) + 360) % 360;
+    }
+
+    function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const toRad = deg => (deg * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    function getShipperBearing(shipper, lat, lng) {
+      const key = getShipperKey(shipper);
+
+      // 1. Nếu API có sẵn heading/bearing/angle
+      const apiHeading = toNumber(shipper.heading ?? shipper.bearing ?? shipper.angle ?? shipper.course);
+      if (apiHeading !== null) {
+        shipperPrevPositions.set(key, { lat, lng, bearing: apiHeading });
+        return apiHeading;
+      }
+
+      // 2. Tính toán dựa trên tọa độ trước đó
+      const prev = shipperPrevPositions.get(key);
+      if (!prev) {
+        shipperPrevPositions.set(key, { lat, lng, bearing: 0 });
+        return 0;
+      }
+
+      const dist = calculateDistanceMeters(prev.lat, prev.lng, lat, lng);
+      // Di chuyển từ 3m trở lên mới cập nhật góc để tránh giật góc do GPS sai số tại chỗ
+      if (dist >= 3) {
+        const bearing = calculateBearing(prev.lat, prev.lng, lat, lng);
+        shipperPrevPositions.set(key, { lat, lng, bearing });
+        return bearing;
+      }
+
+      return prev.bearing || 0;
+    }
+
+    function getShipperCarSvg() {
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 70" width="28" height="48">
+          <!-- Bánh xe -->
+          <rect x="2" y="10" width="5" height="12" rx="2.5" fill="#1e293b"/>
+          <rect x="33" y="10" width="5" height="12" rx="2.5" fill="#1e293b"/>
+          <rect x="2" y="48" width="5" height="12" rx="2.5" fill="#1e293b"/>
+          <rect x="33" y="48" width="5" height="12" rx="2.5" fill="#1e293b"/>
+          
+          <!-- Thân xe đỏ -->
+          <path d="M7 16 C7 6, 13 2, 20 2 C27 2, 33 6, 33 16 L33 54 C33 64, 27 68, 20 68 C13 68, 7 64, 7 54 Z" fill="#DA251D" stroke="#8E0000" stroke-width="1.2"/>
+          
+          <!-- Kính trước -->
+          <path d="M10 20 C10 16, 14 14, 20 14 C26 14, 30 16, 30 20 L29 27 C29 28, 26 29, 20 29 C14 29, 11 28, 11 27 Z" fill="#1f2937"/>
+          
+          <!-- Kính sau -->
+          <path d="M11 48 C11 46, 14 45, 20 45 C26 45, 29 46, 29 48 L28 53 C28 55, 26 56, 20 56 C14 56, 12 55, 12 53 Z" fill="#1f2937"/>
+          
+          <!-- Cửa sổ hai bên -->
+          <path d="M9 28 L10 44 L12 44 L11 28 Z" fill="#1f2937"/>
+          <path d="M31 28 L30 44 L28 44 L29 28 Z" fill="#1f2937"/>
+          
+          <!-- Gương chiếu hậu -->
+          <rect x="3" y="21" width="4" height="6" rx="2" fill="#DA251D" stroke="#8E0000" stroke-width="0.8"/>
+          <rect x="33" y="21" width="4" height="6" rx="2" fill="#DA251D" stroke="#8E0000" stroke-width="0.8"/>
+
+          <!-- Ngôi sao vàng trên nóc xe -->
+          <polygon points="20,31.5 21.8,35.3 25.8,35.6 22.8,38.3 23.7,42.3 20,40.1 16.3,42.3 17.2,38.3 14.2,35.6 18.2,35.3" fill="#FFFF00" stroke="#DDAA00" stroke-width="0.4"/>
+          
+          <!-- Đèn pha trước -->
+          <path d="M9 4 Q12 3 14 6 L10 7 Z" fill="#FFFBEB"/>
+          <path d="M31 4 Q28 3 26 6 L30 7 Z" fill="#FFFBEB"/>
+          
+          <!-- Đèn hậu đỏ -->
+          <rect x="9" y="64" width="5" height="3" rx="1.5" fill="#FF4444"/>
+          <rect x="26" y="64" width="5" height="3" rx="1.5" fill="#FF4444"/>
+        </svg>
+      `;
+    }
+
     function renderShippers(shippers) {
       shipperLayer.clearLayers();
 
@@ -1378,12 +1501,19 @@
 
         const name = shipper?.user?.name || shipper?.name || "Shipper";
         const online = shipper?.is_online === true;
+        const bearing = getShipperBearing(shipper, lat, lng);
 
         const icon = L.divIcon({
           className: "",
-          html: `<div class="shipper-icon">${online ? "🛵" : "⚪"}</div>`,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17]
+          html: `
+            <div class="shipper-car-marker">
+              <div class="shipper-car-body ${online ? "" : "shipper-car-offline"}" style="transform: rotate(${Math.round(bearing)}deg);">
+                ${getShipperCarSvg()}
+              </div>
+            </div>
+          `,
+          iconSize: [32, 52],
+          iconAnchor: [16, 26]
         });
 
         const popup = `
