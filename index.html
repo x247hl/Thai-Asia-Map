@@ -338,7 +338,7 @@
     }
 
     .order-inprocess {
-      --order-color: #0169f0;
+      --order-color: #035ccf;
     }
 
     .order-inprocess-scheduled {
@@ -414,6 +414,12 @@
 
     .shipper-focus-row:active {
       background: rgba(242, 118, 24, .12);
+    }
+
+    .shipper-person-row.following {
+      background: rgba(3, 92, 207, .12);
+      box-shadow: 0 0 0 1.5px rgba(3, 92, 207, .35);
+      border-radius: 8px;
     }
 
     .shipper-eta {
@@ -779,6 +785,7 @@
     }).setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
 
     function resetMapToRestaurant() {
+      stopFollowShipper();
       map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
     }
 
@@ -1229,9 +1236,16 @@
       `;
     }
 
+    let openedOrderKey = null;
+
+    function getOrderKey(order) {
+      return String(order?.id || order?.code || `${order?.latitude}_${order?.longitude}`);
+    }
+
     function renderOrders(orders) {
       orderLayer.clearLayers();
       const points = [];
+      let markerToReopen = null;
 
       orders.forEach(order => {
         const lat = toNumber(order.latitude);
@@ -1241,6 +1255,7 @@
         const time = formatOrderTime(order.created_at);
         const code = order.code ?? "?";
         const status = order.status ?? "";
+        const orderKey = getOrderKey(order);
 
         const icon = L.divIcon({
           className: "",
@@ -1288,15 +1303,34 @@
           </div>
         `;
 
-        L.marker([lat, lng], { icon })
+        const marker = L.marker([lat, lng], { icon })
           .bindPopup(popup, {
             maxWidth: 380,
-            minWidth: 280
+            minWidth: 280,
+            autoPan: false
           })
           .addTo(orderLayer);
 
+        marker.on("popupopen", () => {
+          openedOrderKey = orderKey;
+        });
+
+        marker.on("popupclose", () => {
+          if (openedOrderKey === orderKey) {
+            openedOrderKey = null;
+          }
+        });
+
+        if (openedOrderKey === orderKey) {
+          markerToReopen = marker;
+        }
+
         points.push([lat, lng]);
       });
+
+      if (markerToReopen) {
+        markerToReopen.openPopup();
+      }
 
       els.orderCount.textContent = String(orders.length);
       els.orderSummary.classList.toggle("has-orders", orders.length >= 1);
@@ -1366,10 +1400,43 @@
     }
 
     const shipperMarkers = new Map();
+    let activeFollowShipperKey = null;
+
+    function stopFollowShipper() {
+      if (activeFollowShipperKey) {
+        activeFollowShipperKey = null;
+        updateFollowUi();
+      }
+    }
+
+    map.on("dragstart", stopFollowShipper);
+
+    function updateFollowUi() {
+      if (!els.shipperStatusList) return;
+      const rows = els.shipperStatusList.querySelectorAll(".shipper-person-row");
+      rows.forEach(row => {
+        const key = row.dataset.shipperKey;
+        if (key && activeFollowShipperKey && key === activeFollowShipperKey) {
+          row.classList.add("following");
+        } else {
+          row.classList.remove("following");
+        }
+      });
+    }
 
     function focusShipper(shipper) {
       const key = getShipperKey(shipper);
       const marker = shipperMarkers.get(key);
+
+      // Nếu bấm lại vào chính shipper đang bám đuôi -> hủy bám đuôi
+      if (activeFollowShipperKey === key) {
+        activeFollowShipperKey = null;
+        updateFollowUi();
+        return;
+      }
+
+      // Kích hoạt chế độ bám đuôi theo xe này
+      activeFollowShipperKey = key;
 
       let targetLat = toNumber(shipper.latitude ?? shipper.lat);
       let targetLng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
@@ -1389,6 +1456,8 @@
       if (marker) {
         marker.openPopup();
       }
+
+      updateFollowUi();
     }
 
     function renderShipperStatus(shippers) {
@@ -1403,14 +1472,16 @@
       }
 
       visibleShippers.forEach(shipper => {
+        const key = getShipperKey(shipper);
         const name = shipper?.user?.name || shipper?.name || "Shipper";
         const online = shipper?.is_online === true;
         const age = formatRelativeTime(getShipperSeenAt(shipper));
         const eta = shipper._eta;
 
         const row = document.createElement("div");
-        row.className = "shipper-person-row shipper-focus-row";
-        row.title = "Xem vị trí shipper";
+        row.className = "shipper-person-row shipper-focus-row" + (activeFollowShipperKey === key ? " following" : "");
+        row.dataset.shipperKey = key;
+        row.title = "Bấm để bám đuôi theo dõi shipper";
         row.setAttribute("role", "button");
         row.tabIndex = 0;
         row.addEventListener("click", () => {
@@ -1761,6 +1832,17 @@
 
         shipperMarkers.set(getShipperKey(shipper), marker);
       });
+
+      // Nếu đang bật chế độ bám đuôi, tự động cuộn bản đồ theo vị trí mới nhất của xe
+      if (activeFollowShipperKey) {
+        const activeMarker = shipperMarkers.get(activeFollowShipperKey);
+        if (activeMarker) {
+          const latLng = activeMarker.getLatLng();
+          map.panTo(latLng, { animate: true, duration: 1 });
+        }
+      }
+
+      updateFollowUi();
     }
 
     async function loadShippers() {
