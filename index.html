@@ -658,16 +658,58 @@
       return [];
     }
 
+    function unwrapPage(payload) {
+      if (Array.isArray(payload)) {
+        return { items: payload, lastPage: 1 };
+      }
+
+      if (Array.isArray(payload?.data)) {
+        return { items: payload.data, lastPage: 1 };
+      }
+
+      if (Array.isArray(payload?.data?.data)) {
+        return {
+          items: payload.data.data,
+          lastPage: Math.max(1, Number(payload.data.last_page) || 1)
+        };
+      }
+
+      return { items: [], lastPage: 1 };
+    }
+
     async function fetchJson(url) {
-      const res = await fetch(url, { cache: "no-store" });
+      const freshUrl = new URL(url, window.location.href);
+      freshUrl.searchParams.set("_", String(Date.now()));
+
+      const res = await fetch(freshUrl.toString(), { cache: "no-store" });
       if (!res.ok) throw new Error(`${res.status} ${url}`);
       return res.json();
     }
 
+    function orderStatusUrl(status, page) {
+      return `${API_BASE}/dh/?page=${page}&status=${encodeURIComponent(status)}`;
+    }
+
     async function fetchOrdersByStatus(status) {
-      const url = `${API_BASE}/dh/?page=1&status=${encodeURIComponent(status)}`;
-      const payload = await fetchJson(url);
-      return unwrapList(payload);
+      const firstPayload = await fetchJson(orderStatusUrl(status, 1));
+      const firstPage = unwrapPage(firstPayload);
+
+      if (firstPage.lastPage <= 1) {
+        return firstPage.items;
+      }
+
+      const restPages = [];
+      for (let page = 2; page <= firstPage.lastPage; page++) {
+        restPages.push(page);
+      }
+
+      const restPayloads = await Promise.all(
+        restPages.map(page => fetchJson(orderStatusUrl(status, page)))
+      );
+
+      return firstPage.items.concat(
+        ...restPayloads.map(payload => unwrapPage(payload).items)
+      );
     }
 
     async function loadOrders() {
@@ -1090,6 +1132,12 @@
       if (document.hidden) {
         stopPolling();
       } else {
+        startPolling();
+      }
+    });
+
+    window.addEventListener("pageshow", event => {
+      if (event.persisted && !document.hidden) {
         startPolling();
       }
     });
