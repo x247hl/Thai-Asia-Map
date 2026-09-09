@@ -44,16 +44,24 @@
 
     #map { width: 100%; height: 100%; }
 
-    .summary {
+    .top-panel {
       position: fixed;
-      left: 10px;
+      right: 10px;
       top: calc(10px + env(safe-area-inset-top));
       z-index: 1000;
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: flex-end;
       gap: 7px;
       max-width: calc(100vw - 20px);
       pointer-events: none;
+    }
+
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 7px;
     }
 
     .summary-pill {
@@ -68,6 +76,18 @@
     .summary-pill b {
       font-size: 14px;
       margin-right: 3px;
+    }
+
+    .top-shipper-list {
+      width: min(300px, calc(100vw - 20px));
+      max-height: min(42vh, 260px);
+      overflow-y: auto;
+      background: rgba(255,255,255,.96);
+      border-radius: 12px;
+      padding: 8px 10px;
+      box-shadow: 0 3px 14px rgba(0,0,0,.18);
+      box-sizing: border-box;
+      pointer-events: auto;
     }
 
     .filter-button {
@@ -181,6 +201,12 @@
       padding-top: 9px;
     }
 
+    .top-shipper-list .shipper-list {
+      border-top: 0;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
     .shipper-list-title {
       font-size: 12px;
       color: #666;
@@ -207,6 +233,41 @@
       white-space: nowrap;
     }
 
+    .map-bottom-controls {
+      position: fixed;
+      left: 50%;
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .map-bottom-controls button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #cfcfcf;
+      background: rgba(255,255,255,.97);
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+      color: #222;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .map-bottom-controls .home-button {
+      width: 34px;
+      height: 34px;
+      font-size: 20px;
+    }
+
     .shipper-icon {
       font-size: 25px;
       line-height: 25px;
@@ -221,8 +282,8 @@
     .popup-line { margin: 2px 0; }
 
     @media (min-width: 769px) {
-      .summary {
-        left: 20px;
+      .top-panel {
+        right: 20px;
         top: 20px;
       }
 
@@ -235,6 +296,10 @@
         right: 20px;
         bottom: 72px;
       }
+
+      .map-bottom-controls {
+        bottom: 20px;
+      }
     }
   </style>
 </head>
@@ -242,10 +307,27 @@
 <body>
   <div id="map"></div>
 
-  <div class="summary">
-    <div class="summary-pill"><b id="orderCount">0</b> đơn</div>
-    <div class="summary-pill"><b id="shipperCount">0</b> shipper</div>
-    <div class="summary-pill">Zoom <b id="currentZoom">0</b></div>
+  <div class="top-panel">
+    <div class="summary">
+      <div class="summary-pill">Zoom <b id="currentZoom">0</b></div>
+      <div class="summary-pill"><b id="orderCount">0</b> đơn</div>
+      <div class="summary-pill"><b id="shipperCount">0</b> shipper</div>
+    </div>
+
+    <div class="top-shipper-list">
+      <div class="shipper-list">
+        <div class="shipper-list-title">Từng shipper</div>
+        <div id="shipperList">
+          <div style="font-size:12px;color:#999;padding:5px 0;">Đang tải...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-bottom-controls" aria-label="Điều khiển bản đồ">
+    <button id="zoomOutButton" type="button" title="Thu nhỏ">−</button>
+    <button id="homeButton" class="home-button" type="button" title="Về vị trí quán">⌂</button>
+    <button id="zoomInButton" type="button" title="Phóng to">+</button>
   </div>
 
   <button id="filterButton" class="filter-button" type="button">⚙ Bộ lọc</button>
@@ -276,13 +358,6 @@
       <span>Hiện shipper</span>
       <input id="showShippers" type="checkbox" checked />
     </label>
-
-    <div class="shipper-list">
-      <div class="shipper-list-title">Từng shipper</div>
-      <div id="shipperList">
-        <div style="font-size:12px;color:#999;padding:5px 0;">Đang tải...</div>
-      </div>
-    </div>
 
     <div class="update-row">
       <span>Tự cập nhật</span>
@@ -326,7 +401,9 @@
 
     // Mỗi lần mở trang, map luôn bắt đầu tại quán.
     // Dữ liệu đơn/shipper tải xong sẽ KHÔNG tự kéo map sang chỗ khác.
-    const map = L.map("map").setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
+    const map = L.map("map", {
+      zoomControl: false
+    }).setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -350,28 +427,6 @@
       .bindPopup("<b>Thai Asia SushiBar</b><br>Leipziger Chaussee 147")
       .addTo(map);
 
-    // Nút quay nhanh về tâm quán.
-    const HomeControl = L.Control.extend({
-      options: { position: "topleft" },
-      onAdd: function () {
-        const container = L.DomUtil.create("div", "leaflet-bar");
-        const button = L.DomUtil.create("a", "", container);
-        button.href = "#";
-        button.title = "Về vị trí quán";
-        button.innerHTML = "⌂";
-        button.style.fontSize = "22px";
-        button.style.lineHeight = "30px";
-        button.style.textAlign = "center";
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(button, "click", L.DomEvent.preventDefault)
-                  .on(button, "click", () => {
-                    map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
-                  });
-        return container;
-      }
-    });
-    map.addControl(new HomeControl());
-
     let refreshTimer = null;
     let refreshing = false;
 
@@ -386,6 +441,9 @@
       deliveryOnly: document.getElementById("deliveryOnly"),
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
+      zoomOutButton: document.getElementById("zoomOutButton"),
+      homeButton: document.getElementById("homeButton"),
+      zoomInButton: document.getElementById("zoomInButton"),
       orderCount: document.getElementById("orderCount"),
       shipperCount: document.getElementById("shipperCount"),
       currentZoom: document.getElementById("currentZoom"),
@@ -399,6 +457,18 @@
 
     map.on("zoomend", updateZoomDisplay);
     updateZoomDisplay();
+
+    els.zoomOutButton.addEventListener("click", () => {
+      map.zoomOut();
+    });
+
+    els.homeButton.addEventListener("click", () => {
+      map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
+    });
+
+    els.zoomInButton.addEventListener("click", () => {
+      map.zoomIn();
+    });
 
     els.filterButton.addEventListener("click", () => {
       els.filterPanel.classList.toggle("open");
