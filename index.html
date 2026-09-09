@@ -381,7 +381,7 @@
 
   <div class="map-bottom-controls" aria-label="Điều khiển bản đồ">
     <button id="homeButton" class="home-button" type="button" title="Về vị trí quán">⌂</button>
-    <button id="reloadButton" class="reload-button" type="button" title="Tải lại dữ liệu">↻</button>
+    <button id="reloadButton" class="reload-button" type="button" title="Tải lại trang">↻</button>
   </div>
 
   <button id="filterButton" class="filter-button" type="button" title="Bộ lọc" aria-label="Bộ lọc">⚙</button>
@@ -522,7 +522,11 @@
     });
 
     els.reloadButton.addEventListener("click", () => {
-      refreshAll();
+      els.reloadButton.classList.add("loading");
+      els.reloadButton.disabled = true;
+      setTimeout(() => {
+        window.location.reload();
+      }, 120);
     });
 
     els.filterButton.addEventListener("click", () => {
