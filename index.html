@@ -327,6 +327,19 @@
       max-width: calc(100vw - 86px);
     }
 
+    .shipper-age {
+      margin-left: auto;
+      color: #8a8f9a;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .setting-shipper-list {
+      border-top: 1px solid #eee;
+      margin-top: 8px;
+      padding-top: 10px;
+    }
+
     .map-bottom-controls {
       position: fixed;
       left: 50%;
@@ -426,7 +439,7 @@
 
     <div class="top-shipper-list">
       <div class="shipper-list">
-        <div id="shipperList">
+        <div id="shipperStatusList">
           <div style="font-size:12px;color:#999;padding:5px 0;">Đang tải...</div>
         </div>
       </div>
@@ -471,6 +484,13 @@
       <span>Hiện shipper</span>
       <input id="showShippers" type="checkbox" checked />
     </label>
+
+    <div class="setting-shipper-list">
+      <div class="shipper-list-title">Tất cả shipper</div>
+      <div id="shipperSettingList">
+        <div style="font-size:12px;color:#999;padding:5px 0;">Đang tải...</div>
+      </div>
+    </div>
 
     <div class="update-row">
       <span>Tự cập nhật</span>
@@ -543,8 +563,10 @@
     let refreshTimer = null;
     let refreshing = false;
 
+    const SHIPPER_VISIBILITY_KEY = "thaiasia.shipperVisibility";
+
     // Lưu trạng thái bật/tắt từng shipper.
-    const shipperVisibility = new Map();
+    const shipperVisibility = loadShipperVisibility();
     let lastShippers = [];
 
     const els = {
@@ -560,7 +582,8 @@
       orderCount: document.getElementById("orderCount"),
       shipperCount: document.getElementById("shipperCount"),
       currentZoom: document.getElementById("currentZoom"),
-      shipperList: document.getElementById("shipperList"),
+      shipperStatusList: document.getElementById("shipperStatusList"),
+      shipperSettingList: document.getElementById("shipperSettingList"),
       lastUpdate: document.getElementById("lastUpdate")
     };
 
@@ -795,6 +818,49 @@
       );
     }
 
+    function loadShipperVisibility() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SHIPPER_VISIBILITY_KEY) || "{}");
+        return new Map(Object.entries(saved));
+      } catch (err) {
+        console.warn("Không đọc được cấu hình shipper:", err);
+        return new Map();
+      }
+    }
+
+    function saveShipperVisibility() {
+      try {
+        localStorage.setItem(
+          SHIPPER_VISIBILITY_KEY,
+          JSON.stringify(Object.fromEntries(shipperVisibility))
+        );
+      } catch (err) {
+        console.warn("Không lưu được cấu hình shipper:", err);
+      }
+    }
+
+    function getShipperSeenAt(shipper) {
+      return shipper?.last_seen_at || shipper?.updated_at || shipper?.created_at || "";
+    }
+
+    function formatRelativeTime(value) {
+      if (!value) return "";
+
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return "";
+
+      const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+      if (seconds < 60) return `${seconds}s trước`;
+
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}p trước`;
+
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}g trước`;
+
+      return `${Math.floor(hours / 24)}n trước`;
+    }
+
     function isShipperVisible(shipper) {
       const key = getShipperKey(shipper);
       if (!shipperVisibility.has(key)) {
@@ -803,11 +869,48 @@
       return shipperVisibility.get(key) !== false;
     }
 
+    function renderShipperStatus(shippers) {
+      els.shipperStatusList.innerHTML = "";
+
+      const visibleShippers = shippers.filter(isShipperVisible);
+
+      if (!visibleShippers.length) {
+        els.shipperStatusList.innerHTML =
+          '<div style="font-size:12px;color:#999;padding:5px 0;">Không có shipper</div>';
+        return;
+      }
+
+      visibleShippers.forEach(shipper => {
+        const name = shipper?.user?.name || shipper?.name || "Shipper";
+        const online = shipper?.is_online === true;
+        const age = formatRelativeTime(getShipperSeenAt(shipper));
+
+        const row = document.createElement("div");
+        row.className = "shipper-person-row";
+
+        const icon = document.createElement("span");
+        icon.textContent = online ? "🛵" : "⚪";
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "name";
+        nameEl.textContent = name;
+
+        const ageEl = document.createElement("span");
+        ageEl.className = "shipper-age";
+        ageEl.textContent = age;
+
+        row.appendChild(icon);
+        row.appendChild(nameEl);
+        row.appendChild(ageEl);
+        els.shipperStatusList.appendChild(row);
+      });
+    }
+
     function renderShipperFilter(shippers) {
-      els.shipperList.innerHTML = "";
+      els.shipperSettingList.innerHTML = "";
 
       if (!shippers.length) {
-        els.shipperList.innerHTML =
+        els.shipperSettingList.innerHTML =
           '<div style="font-size:12px;color:#999;padding:5px 0;">Không có shipper</div>';
         return;
       }
@@ -815,6 +918,8 @@
       shippers.forEach(shipper => {
         const key = getShipperKey(shipper);
         const name = shipper?.user?.name || shipper?.name || "Shipper";
+        const online = shipper?.is_online === true;
+        const age = formatRelativeTime(getShipperSeenAt(shipper));
 
         if (!shipperVisibility.has(key)) {
           shipperVisibility.set(key, true);
@@ -829,20 +934,27 @@
 
         checkbox.addEventListener("change", () => {
           shipperVisibility.set(key, checkbox.checked);
+          saveShipperVisibility();
+          renderShipperStatus(lastShippers);
           renderShippers(lastShippers);
         });
 
         const icon = document.createElement("span");
-        icon.textContent = "🛵";
+        icon.textContent = online ? "🛵" : "⚪";
 
         const nameEl = document.createElement("span");
         nameEl.className = "name";
         nameEl.textContent = name;
 
+        const ageEl = document.createElement("span");
+        ageEl.className = "shipper-age";
+        ageEl.textContent = age;
+
         label.appendChild(checkbox);
         label.appendChild(icon);
         label.appendChild(nameEl);
-        els.shipperList.appendChild(label);
+        label.appendChild(ageEl);
+        els.shipperSettingList.appendChild(label);
       });
     }
 
@@ -884,7 +996,7 @@
       });
 
       els.shipperCount.textContent =
-        String(shippers.filter(s => s?.is_online === true).length);
+        String(shippers.filter(s => s?.is_online === true && isShipperVisible(s)).length);
     }
 
     async function loadShippers() {
@@ -892,6 +1004,7 @@
       const shippers = unwrapList(payload);
 
       lastShippers = shippers;
+      renderShipperStatus(shippers);
       renderShipperFilter(shippers);
       renderShippers(shippers);
 
