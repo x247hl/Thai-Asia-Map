@@ -327,6 +327,15 @@
       max-width: calc(100vw - 86px);
     }
 
+    .shipper-focus-row {
+      cursor: pointer;
+      border-radius: 8px;
+    }
+
+    .shipper-focus-row:active {
+      background: rgba(242,118,24,.12);
+    }
+
     .shipper-age {
       margin-left: auto;
       color: #8a8f9a;
@@ -367,12 +376,6 @@
       align-items: center;
       justify-content: center;
       padding: 0;
-    }
-
-    .map-bottom-controls .home-button {
-      width: 34px;
-      height: 34px;
-      font-size: 20px;
     }
 
     .map-bottom-controls .reload-button {
@@ -456,7 +459,6 @@
   </div>
 
   <div class="map-bottom-controls" aria-label="Điều khiển bản đồ">
-    <button id="homeButton" class="home-button" type="button" title="Về vị trí quán">⌂</button>
     <button id="reloadButton" class="reload-button" type="button" title="Tải lại trang">↻</button>
   </div>
 
@@ -526,6 +528,7 @@
     const DEFAULT_ZOOM_WEB = 12;
     const DEFAULT_ZOOM_ANDROID = 12;
     const DEFAULT_ZOOM_IPHONE = 11;
+    const SHIPPER_FOCUS_ZOOM = 17;
 
     function getDefaultZoom() {
       const platform = navigator.userAgent || navigator.platform || "";
@@ -585,7 +588,6 @@
       deliveryOnly: document.getElementById("deliveryOnly"),
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
-      homeButton: document.getElementById("homeButton"),
       reloadButton: document.getElementById("reloadButton"),
       orderSummary: document.getElementById("orderSummary"),
       orderCount: document.getElementById("orderCount"),
@@ -602,10 +604,6 @@
 
     map.on("zoomend", updateZoomDisplay);
     updateZoomDisplay();
-
-    els.homeButton.addEventListener("click", () => {
-      map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
-    });
 
     els.reloadButton.addEventListener("click", () => {
       els.reloadButton.classList.add("loading");
@@ -859,15 +857,15 @@
       if (Number.isNaN(d.getTime())) return "";
 
       const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-      if (seconds < 60) return `${seconds}s trước`;
+      if (seconds < 60) return `${seconds}s`;
 
       const minutes = Math.floor(seconds / 60);
-      if (minutes < 60) return `${minutes}p trước`;
+      if (minutes < 60) return `${minutes}p`;
 
       const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `${hours}g trước`;
+      if (hours < 24) return `${hours}g`;
 
-      return `${Math.floor(hours / 24)}n trước`;
+      return `${Math.floor(hours / 24)}n`;
     }
 
     function isShipperVisible(shipper) {
@@ -876,6 +874,16 @@
         shipperVisibility.set(key, true);
       }
       return shipperVisibility.get(key) !== false;
+    }
+
+    function focusShipper(shipper) {
+      const lat = toNumber(shipper.latitude ?? shipper.lat);
+      const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
+      if (lat === null || lng === null) return;
+
+      map.setView([lat, lng], Math.max(map.getZoom(), SHIPPER_FOCUS_ZOOM), {
+        animate: true
+      });
     }
 
     function renderShipperStatus(shippers) {
@@ -895,7 +903,19 @@
         const age = formatRelativeTime(getShipperSeenAt(shipper));
 
         const row = document.createElement("div");
-        row.className = "shipper-person-row";
+        row.className = "shipper-person-row shipper-focus-row";
+        row.title = "Xem vị trí shipper";
+        row.setAttribute("role", "button");
+        row.tabIndex = 0;
+        row.addEventListener("click", () => {
+          focusShipper(shipper);
+        });
+        row.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            focusShipper(shipper);
+          }
+        });
 
         const icon = document.createElement("span");
         icon.textContent = online ? "🛵" : "⚪";
