@@ -1953,9 +1953,6 @@
       `;
     }
 
-    let openedOrderKey = null;
-    let isRefreshingOrders = false;
-
     function focusOrderMarker(lat, lng, zoom = ORDER_FOCUS_ZOOM) {
       if (lat === null || lng === null) return;
       const targetZoom = zoom || map.getZoom();
@@ -2138,7 +2135,7 @@
         });
       }
 
-      if (els.routeStartSelect.querySelector(`option[value="${prevVal}"]`)) {
+      if (els.routeStartSelect.querySelector && els.routeStartSelect.querySelector(`option[value="${prevVal}"]`)) {
         els.routeStartSelect.value = prevVal;
       } else {
         els.routeStartSelect.value = "restaurant";
