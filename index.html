@@ -817,25 +817,16 @@
       }
     }
 
-    .route-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px 10px;
-      border-bottom: 1px solid #f1f3f7;
-    }
-
-    .route-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: #0f172a;
-    }
-
     .route-close-btn {
-      background: transparent;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.05);
       border: 0;
       color: #64748b;
-      font-size: 16px;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
       width: 26px;
       height: 26px;
@@ -843,10 +834,11 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.15s, color 0.15s;
     }
 
     .route-close-btn:hover {
-      background: #f1f5f9;
+      background: #e2e8f0;
       color: #0f172a;
     }
 
@@ -1105,48 +1097,60 @@
       gap: 6px;
     }
 
-    .route-actions {
+    .route-top-row {
       display: flex;
-      gap: 7px;
-      margin-top: 2px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding-right: 26px;
+      flex-wrap: nowrap;
     }
 
-    .route-action-btn {
-      flex: 1;
-      height: 34px;
-      border-radius: 8px;
-      font-size: 12px;
+    .route-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .route-mini-action-btn {
+      height: 27px;
+      padding: 0 8px;
+      border-radius: 6px;
+      font-size: 11px;
       font-weight: 700;
       border: 0;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
+      gap: 3px;
+      white-space: nowrap;
       transition: background .15s, opacity .15s;
     }
 
-    .route-action-btn:disabled {
-      opacity: 0.45;
+    .route-mini-action-btn:disabled {
+      opacity: 0.4;
       cursor: not-allowed;
     }
 
-    .route-action-btn.primary {
-      background: #7c3aed;
-      color: #fff;
+    .route-mini-action-btn.primary {
+      background: #ede9fe;
+      color: #6d28d9;
+      border: 1px solid #ddd6fe;
     }
 
-    .route-action-btn.primary:not(:disabled):hover {
-      background: #6d28d9;
+    .route-mini-action-btn.primary:not(:disabled):hover {
+      background: #ddd6fe;
     }
 
-    .route-action-btn.danger {
+    .route-mini-action-btn.danger {
       background: #fee2e2;
-      color: #dc2626;
+      color: #b91c1c;
       border: 1px solid #fecaca;
     }
 
-    .route-action-btn.danger:not(:disabled):hover {
+    .route-mini-action-btn.danger:not(:disabled):hover {
       background: #fecaca;
     }
 
@@ -1317,16 +1321,20 @@
   </button>
 
   <div id="routePanel" class="route-panel">
-    <div class="route-header">
-      <div class="route-title">🛣️ Lộ trình giao hàng chuỗi</div>
-      <button id="routeCloseButton" class="route-close-btn" type="button" title="Đóng">✕</button>
-    </div>
+    <button id="routeCloseButton" class="route-close-btn" type="button" title="Đóng">✕</button>
 
     <div class="route-body">
-      <label class="route-toggle-row">
-        <input id="routeReturnToShop" type="checkbox" />
-        <span>Quay về Quán khi giao xong</span>
-      </label>
+      <div class="route-top-row">
+        <label class="route-toggle-row">
+          <input id="routeReturnToShop" type="checkbox" />
+          <span>Quay về Quán</span>
+        </label>
+
+        <div class="route-top-actions">
+          <button id="routeFitViewBtn" class="route-mini-action-btn primary" type="button" title="Xem toàn cảnh lộ trình" disabled>🔍 Toàn cảnh</button>
+          <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình" disabled>🗑️ Xóa lộ trình</button>
+        </div>
+      </div>
 
       <div id="routeSummaryBox" class="route-summary-box hidden">
         <div class="route-summary-main">
@@ -1340,11 +1348,6 @@
           </div>
         </div>
         <div id="routeLegsList" class="route-legs-list"></div>
-      </div>
-
-      <div class="route-actions">
-        <button id="routeFitViewBtn" class="route-action-btn primary" type="button" disabled>🔍 Toàn cảnh</button>
-        <button id="routeClearBtn" class="route-action-btn danger" type="button" disabled>🗑️ Xóa lộ trình</button>
       </div>
     </div>
   </div>
@@ -1401,7 +1404,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v43</span>
+      <span style="font-weight: 700; color: #7c3aed;">v45</span>
     </div>
   </div>
 
