@@ -583,6 +583,26 @@
       margin-bottom: 6px;
     }
 
+    .order-popup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+      padding-right: 20px;
+    }
+
+    .order-popup-header .popup-title {
+      margin-bottom: 0;
+    }
+
+    .order-popup-time {
+      font-size: 12px;
+      color: #555;
+      font-weight: normal;
+      white-space: nowrap;
+    }
+
     .popup-line {
       margin: 2px 0;
     }
@@ -1218,6 +1238,26 @@
       }).format(d);
     }
 
+    function formatOrderAddress(order) {
+      if (!order) return "";
+      const street = String(order.address || "").trim();
+      const houseNum = String(order.apartment_number || order.house_number || "").trim();
+      const postcode = String(order.postcode || "").trim();
+      const city = String(order.city || "").trim();
+
+      let streetLine = street;
+      if (houseNum) {
+        if (!street) {
+          streetLine = houseNum;
+        } else if (!street.endsWith(houseNum)) {
+          streetLine = `${street} ${houseNum}`;
+        }
+      }
+
+      const cityLine = [postcode, city].filter(Boolean).join(" ");
+      return [streetLine, cityLine].filter(Boolean).join(", ");
+    }
+
     function formatOrderDateTime(createdAt) {
       if (!createdAt) return "";
       const d = new Date(createdAt);
@@ -1265,9 +1305,9 @@
 
         let itemLabel = "";
         if (rawCode) {
-          itemLabel = `${quantity}x ${rawCode}`;
+          itemLabel = `${quantity} x ${rawCode}`;
         } else {
-          itemLabel = `${quantity}x ${rawName || "Món ăn"}`;
+          itemLabel = `${quantity} x ${rawName || "Món ăn"}`;
         }
 
         return `
@@ -1344,12 +1384,7 @@
         });
 
         const fullName = `${order.first_name ?? ""} ${order.last_name ?? ""}`.trim();
-        const fullAddress = [
-          order.address,
-          order.apartment_number ? `Nr. ${order.apartment_number}` : "",
-          order.postcode,
-          order.city
-        ].filter(Boolean).join(", ");
+        const fullAddress = formatOrderAddress(order);
         const orderTime = String(order.time || "").trim();
         const note = String(order.note || "").trim();
         const noteHtml = note
@@ -1361,11 +1396,13 @@
 
         const popup = `
           <div class="order-popup">
-            <div class="popup-title">Đơn #${escapeHtml(code)}</div>
+            <div class="order-popup-header">
+              <span class="popup-title">Đơn #${escapeHtml(code)}</span>
+              ${order.created_at ? `<span class="order-popup-time">${escapeHtml(formatOrderDateTime(order.created_at))}</span>` : ""}
+            </div>
             <div class="popup-line"><b>${escapeHtml(orderStatusText(status, order.status_title))}</b></div>
             ${fullName ? `<div class="popup-line">${escapeHtml(fullName)}</div>` : ""}
             ${fullAddress ? `<div class="popup-line">${escapeHtml(fullAddress)}</div>` : ""}
-            ${order.created_at ? `<div class="popup-line">Ngày tạo: ${escapeHtml(formatOrderDateTime(order.created_at))}</div>` : ""}
             ${orderTime ? `<div class="popup-line">Thời gian: ${escapeHtml(orderTime)}</div>` : ""}
             ${noteHtml}
             ${renderOrderItems(order.items)}
