@@ -118,18 +118,11 @@
       top: calc(10px + env(safe-area-inset-top));
       z-index: 1000;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
+      flex-direction: row;
+      align-items: flex-start;
       gap: 7px;
       max-width: calc(100vw - 20px);
       pointer-events: none;
-    }
-
-    .summary {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 7px;
     }
 
     .summary-pill {
@@ -139,6 +132,8 @@
       box-shadow: 0 3px 14px rgba(0, 0, 0, .18);
       font-size: 12px;
       white-space: nowrap;
+      pointer-events: auto;
+      flex-shrink: 0;
     }
 
     .summary-pill b {
@@ -164,13 +159,13 @@
     .top-shipper-list {
       width: max-content;
       min-width: 0;
-      max-width: calc(100vw - 20px);
+      max-width: calc(100vw - 110px);
       max-height: min(42vh, 260px);
       overflow-y: auto;
       overflow-x: hidden;
       background: rgba(255, 255, 255, .96);
       border-radius: 12px;
-      padding: 8px 10px;
+      padding: 6px 10px;
       box-shadow: 0 3px 14px rgba(0, 0, 0, .18);
       box-sizing: border-box;
       pointer-events: auto;
@@ -678,10 +673,7 @@
   <div id="map"></div>
 
   <div class="top-panel">
-    <div class="summary">
-      <div id="orderSummary" class="summary-pill order-summary no-orders"><b id="orderCount">0</b> đơn</div>
-      <div class="summary-pill"><b id="shipperCount">0</b> shipper</div>
-    </div>
+    <div id="orderSummary" class="summary-pill order-summary no-orders"><b id="orderCount">0</b> đơn</div>
 
     <div class="top-shipper-list">
       <div class="shipper-list">
@@ -830,7 +822,6 @@
       reloadButton: document.getElementById("reloadButton"),
       orderSummary: document.getElementById("orderSummary"),
       orderCount: document.getElementById("orderCount"),
-      shipperCount: document.getElementById("shipperCount"),
       currentZoom: document.getElementById("currentZoom"),
       shipperStatusList: document.getElementById("shipperStatusList"),
       shipperSettingList: document.getElementById("shipperSettingList"),
@@ -1591,32 +1582,65 @@
       return result;
     }
 
+    function normalizeContinuousAngle(currentAngle, targetAngle) {
+      let delta = (targetAngle - (currentAngle % 360) + 540) % 360 - 180;
+      return currentAngle + delta;
+    }
+
     function getShipperBearing(shipper, lat, lng) {
       const key = getShipperKey(shipper);
+      const speed = toNumber(shipper.speed);
+      const prev = shipperPrevPositions.get(key);
 
-      // 1. Nếu API có sẵn heading/bearing/angle
+      // 1. Nếu API có sẵn heading/bearing/angle từ GPS thiết bị
       const apiHeading = toNumber(shipper.heading ?? shipper.bearing ?? shipper.angle ?? shipper.course);
-      if (apiHeading !== null) {
-        shipperPrevPositions.set(key, { lat, lng, bearing: apiHeading });
-        return apiHeading;
+      if (apiHeading !== null && apiHeading >= 0) {
+        if (!prev) {
+          shipperPrevPositions.set(key, { lat, lng, bearing: apiHeading, continuousBearing: apiHeading });
+          return apiHeading;
+        }
+
+        // Nếu xe đang dừng hoặc chạy quá chậm (< 4 km/h), giữ nguyên hướng cũ
+        if (speed !== null && speed < 4) {
+          shipperPrevPositions.set(key, { ...prev, lat, lng });
+          return prev.continuousBearing ?? prev.bearing ?? 0;
+        }
+
+        const newContinuous = normalizeContinuousAngle(prev.continuousBearing ?? prev.bearing ?? 0, apiHeading);
+        shipperPrevPositions.set(key, { lat, lng, bearing: apiHeading, continuousBearing: newContinuous });
+        return newContinuous;
       }
 
-      // 2. Tính toán dựa trên tọa độ trước đó
-      const prev = shipperPrevPositions.get(key);
+      // 2. Tính toán dựa trên tọa độ GPS trước đó (Anti-jitter filter)
       if (!prev) {
-        shipperPrevPositions.set(key, { lat, lng, bearing: 0 });
+        shipperPrevPositions.set(key, { lat, lng, bearing: 0, continuousBearing: 0 });
         return 0;
       }
 
       const dist = calculateDistanceMeters(prev.lat, prev.lng, lat, lng);
-      // Di chuyển từ 3m trở lên mới cập nhật góc để tránh giật góc do GPS sai số tại chỗ
-      if (dist >= 3) {
-        const bearing = calculateBearing(prev.lat, prev.lng, lat, lng);
-        shipperPrevPositions.set(key, { lat, lng, bearing });
-        return bearing;
+
+      // Quy tắc chống rung:
+      // - Nếu có tốc độ và tốc độ < 5 km/h: xe dừng/đi bộ -> KHÔNG xoay
+      // - Nếu không có thông tin tốc độ: cần di chuyển tối thiểu 12m để lọc GPS drift
+      // - Nếu có tốc độ >= 5 km/h: cần di chuyển tối thiểu 6m
+      const isMoving = speed !== null ? (speed >= 5 && dist >= 6) : (dist >= 12);
+
+      if (isMoving) {
+        const rawBearing = calculateBearing(prev.lat, prev.lng, lat, lng);
+        const currentContinuous = prev.continuousBearing ?? prev.bearing ?? 0;
+        const newContinuous = normalizeContinuousAngle(currentContinuous, rawBearing);
+
+        shipperPrevPositions.set(key, {
+          lat,
+          lng,
+          bearing: rawBearing,
+          continuousBearing: newContinuous
+        });
+        return newContinuous;
       }
 
-      return prev.bearing || 0;
+      // Không đủ điều kiện di chuyển -> giữ nguyên góc cũ, tránh giật góc tại chỗ
+      return prev.continuousBearing ?? prev.bearing ?? 0;
     }
 
     function renderShippers(shippers) {
@@ -1676,9 +1700,6 @@
 
         shipperMarkers.set(getShipperKey(shipper), marker);
       });
-
-      els.shipperCount.textContent =
-        String(shippers.filter(s => s?.is_online === true && isShipperVisible(s)).length);
     }
 
     async function loadShippers() {
