@@ -709,6 +709,477 @@
       font-weight: 600;
     }
 
+    /* Route button & Badge */
+    .route-button {
+      position: fixed;
+      left: 14px;
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      z-index: 1000;
+      width: 38px;
+      height: 38px;
+      border: 1px solid #cfcfcf;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .97);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+      cursor: pointer;
+      font-size: 19px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: transform .15s, background .15s, border-color .15s;
+    }
+
+    .route-button:active {
+      transform: scale(0.95);
+      background: #f0f7ff;
+    }
+
+    .route-button.active {
+      background: #0284c7;
+      color: #fff;
+      border-color: #0369a1;
+      box-shadow: 0 3px 12px rgba(2, 132, 199, 0.4);
+    }
+
+    .route-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border-radius: 9px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
+      box-sizing: border-box;
+    }
+
+    .route-badge.hidden {
+      display: none;
+    }
+
+    /* Route Panel */
+    .route-panel {
+      position: fixed;
+      left: 14px;
+      bottom: calc(60px + env(safe-area-inset-bottom));
+      width: min(380px, calc(100vw - 28px));
+      max-height: min(78vh, calc(100vh - 120px));
+      background: rgba(255, 255, 255, .98);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .24);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .route-panel.show {
+      display: flex;
+      animation: slideUpFade 0.2s ease-out;
+    }
+
+    @keyframes slideUpFade {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .route-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #f1f3f7;
+    }
+
+    .route-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .route-close-btn {
+      background: transparent;
+      border: 0;
+      color: #64748b;
+      font-size: 16px;
+      cursor: pointer;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .route-close-btn:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .route-body {
+      padding: 12px 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .route-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .route-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .route-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .route-count-label {
+      font-size: 11px;
+      color: #0284c7;
+      font-weight: 700;
+    }
+
+    .route-select {
+      width: 100%;
+      height: 36px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0 8px;
+      font-size: 13px;
+      background: #fff;
+      color: #1e293b;
+      box-sizing: border-box;
+    }
+
+    .route-stops-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .route-empty-hint {
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+      padding: 14px 6px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px dashed #cbd5e1;
+      line-height: 1.4;
+    }
+
+    .route-stop-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .route-stop-num {
+      width: 20px;
+      height: 20px;
+      background: #0284c7;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .route-stop-info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .route-stop-name {
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .route-stop-addr {
+      color: #64748b;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .route-stop-btns {
+      display: flex;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
+    .route-stop-btn {
+      width: 22px;
+      height: 22px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #475569;
+      padding: 0;
+    }
+
+    .route-stop-btn:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .route-stop-btn.delete:hover {
+      background: #fee2e2;
+      color: #ef4444;
+      border-color: #fca5a5;
+    }
+
+    .route-quick-add-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .route-quick-add-row.hidden {
+      display: none;
+    }
+
+    .route-quick-label {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .route-quick-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .route-chip {
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      color: #0369a1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    .route-chip:hover {
+      background: #bae6fd;
+    }
+
+    .route-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #334155;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .route-toggle-row input {
+      margin: 0;
+    }
+
+    /* Route Summary Box */
+    .route-summary-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 9px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .route-summary-box.hidden {
+      display: none;
+    }
+
+    .route-summary-main {
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+      border-bottom: 1px dashed #bbf7d0;
+      padding-bottom: 6px;
+    }
+
+    .route-summary-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #166534;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .stat-val {
+      font-size: 14px;
+      color: #15803d;
+      font-weight: 800;
+    }
+
+    .route-legs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11px;
+      color: #166534;
+      line-height: 1.35;
+    }
+
+    .route-leg-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .route-actions {
+      display: flex;
+      gap: 7px;
+      margin-top: 2px;
+    }
+
+    .route-action-btn {
+      flex: 1;
+      height: 34px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background .15s, opacity .15s;
+    }
+
+    .route-action-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .route-action-btn.primary {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    .route-action-btn.primary:not(:disabled):hover {
+      background: #0369a1;
+    }
+
+    .route-action-btn.danger {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    .route-action-btn.danger:not(:disabled):hover {
+      background: #fecaca;
+    }
+
+    /* Popup Button toggle route */
+    .btn-toggle-route {
+      width: 100%;
+      height: 32px;
+      margin-top: 8px;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      color: #0284c7;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+
+    .btn-toggle-route:hover {
+      background: #e0f2fe;
+    }
+
+    .btn-toggle-route.in-route {
+      background: #fee2e2;
+      border-color: #fecaca;
+      color: #dc2626;
+    }
+
+    .btn-toggle-route.in-route:hover {
+      background: #fecaca;
+    }
+
+    /* Numbered Waypoint Badge Icon on Map */
+    .waypoint-badge-marker {
+      width: 22px;
+      height: 22px;
+      background: #0284c7;
+      color: #fff;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 7px rgba(0,0,0,.35);
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
     @media (min-width: 769px) {
       .top-panel {
         right: 20px;
@@ -722,6 +1193,16 @@
 
       .filter-panel {
         right: 20px;
+        bottom: 72px;
+      }
+
+      .route-button {
+        left: 20px;
+        bottom: 20px;
+      }
+
+      .route-panel {
+        left: 20px;
         bottom: 72px;
       }
 
@@ -753,6 +1234,66 @@
         <div id="shipperStatusList">
           <div style="font-size:12px;color:#999;padding:5px 0;">Đang tải...</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <button id="routeButton" class="route-button" type="button" title="Lộ trình giao hàng chuỗi" aria-label="Lộ trình">
+    <span>🛣️</span>
+    <span id="routeBadge" class="route-badge hidden">0</span>
+  </button>
+
+  <div id="routePanel" class="route-panel">
+    <div class="route-header">
+      <div class="route-title">🛣️ Lộ trình giao hàng chuỗi</div>
+      <button id="routeCloseButton" class="route-close-btn" type="button" title="Đóng">✕</button>
+    </div>
+
+    <div class="route-body">
+      <div class="route-field">
+        <label for="routeStartSelect" class="route-label">Điểm xuất phát:</label>
+        <select id="routeStartSelect" class="route-select">
+          <option value="restaurant">🏪 Tại quán (Thai Asia SushiBar)</option>
+        </select>
+      </div>
+
+      <div class="route-field">
+        <div class="route-label-row">
+          <span class="route-label">Các điểm giao (thứ tự):</span>
+          <span id="routeStopCount" class="route-count-label">0 đơn</span>
+        </div>
+        <div id="routeStopsList" class="route-stops-list">
+          <div class="route-empty-hint">Chưa chọn đơn nào.<br>Bấm <b>➕ Lộ trình</b> trong chi tiết đơn để thêm.</div>
+        </div>
+      </div>
+
+      <div id="routeQuickAddRow" class="route-quick-add-row hidden">
+        <span class="route-quick-label">Thêm nhanh đơn chờ:</span>
+        <div id="routeQuickChips" class="route-quick-chips"></div>
+      </div>
+
+      <label class="route-toggle-row">
+        <input id="routeReturnToShop" type="checkbox" checked />
+        <span>Quay về Quán khi giao xong</span>
+      </label>
+
+      <div id="routeSummaryBox" class="route-summary-box hidden">
+        <div class="route-summary-main">
+          <div class="route-summary-stat">
+            <span class="stat-label">Tổng quãng đường</span>
+            <b id="routeTotalDist" class="stat-val">—</b>
+          </div>
+          <div class="route-summary-stat">
+            <span class="stat-label">Tổng thời gian</span>
+            <b id="routeTotalTime" class="stat-val">—</b>
+          </div>
+        </div>
+        <div id="routeLegsList" class="route-legs-list"></div>
+      </div>
+
+      <div class="route-actions">
+        <button id="routeFitViewBtn" class="route-action-btn primary" type="button" disabled>🔍 Toàn cảnh</button>
+        <button id="routeClearBtn" class="route-action-btn danger" type="button" disabled>🗑️ Xóa lộ trình</button>
       </div>
     </div>
   </div>
@@ -907,6 +1448,22 @@
       authError: document.getElementById("authError"),
       filterButton: document.getElementById("filterButton"),
       filterPanel: document.getElementById("filterPanel"),
+      routeButton: document.getElementById("routeButton"),
+      routeBadge: document.getElementById("routeBadge"),
+      routePanel: document.getElementById("routePanel"),
+      routeCloseButton: document.getElementById("routeCloseButton"),
+      routeStartSelect: document.getElementById("routeStartSelect"),
+      routeStopCount: document.getElementById("routeStopCount"),
+      routeStopsList: document.getElementById("routeStopsList"),
+      routeQuickAddRow: document.getElementById("routeQuickAddRow"),
+      routeQuickChips: document.getElementById("routeQuickChips"),
+      routeReturnToShop: document.getElementById("routeReturnToShop"),
+      routeSummaryBox: document.getElementById("routeSummaryBox"),
+      routeTotalDist: document.getElementById("routeTotalDist"),
+      routeTotalTime: document.getElementById("routeTotalTime"),
+      routeLegsList: document.getElementById("routeLegsList"),
+      routeFitViewBtn: document.getElementById("routeFitViewBtn"),
+      routeClearBtn: document.getElementById("routeClearBtn"),
       statusFilter: document.getElementById("statusFilter"),
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
@@ -954,6 +1511,7 @@
       stopPolling();
       orderLayer.clearLayers();
       shipperLayer.clearLayers();
+      if (typeof clearRoute === "function") clearRoute();
       els.authOverlay.classList.remove("hidden");
       if (reasonMessage) {
         els.authError.textContent = reasonMessage;
@@ -1063,8 +1621,62 @@
     });
 
     els.filterButton.addEventListener("click", () => {
-      els.filterPanel.classList.toggle("open");
+      const willOpen = !els.filterPanel.classList.contains("open");
+      els.filterPanel.classList.toggle("open", willOpen);
+      if (willOpen && typeof toggleRoutePanel === "function") {
+        toggleRoutePanel(false);
+      }
     });
+
+    if (els.routeButton) {
+      els.routeButton.addEventListener("click", () => {
+        if (typeof toggleRoutePanel === "function") {
+          toggleRoutePanel();
+        }
+      });
+    }
+
+    if (els.routeCloseButton) {
+      els.routeCloseButton.addEventListener("click", () => {
+        if (typeof toggleRoutePanel === "function") {
+          toggleRoutePanel(false);
+        }
+      });
+    }
+
+    if (els.routeStartSelect) {
+      els.routeStartSelect.addEventListener("change", () => {
+        routeStartType = els.routeStartSelect.value;
+        if (typeof calculateAndDrawRoute === "function") {
+          calculateAndDrawRoute();
+        }
+      });
+    }
+
+    if (els.routeReturnToShop) {
+      els.routeReturnToShop.addEventListener("change", () => {
+        routeReturnToShop = els.routeReturnToShop.checked;
+        if (typeof calculateAndDrawRoute === "function") {
+          calculateAndDrawRoute();
+        }
+      });
+    }
+
+    if (els.routeFitViewBtn) {
+      els.routeFitViewBtn.addEventListener("click", () => {
+        if (typeof fitRouteView === "function") {
+          fitRouteView();
+        }
+      });
+    }
+
+    if (els.routeClearBtn) {
+      els.routeClearBtn.addEventListener("click", () => {
+        if (typeof clearRoute === "function") {
+          clearRoute();
+        }
+      });
+    }
 
     els.statusFilter.addEventListener("change", refreshAll);
 
@@ -1353,6 +1965,7 @@
       const prevOpenedKey = openedOrderKey;
       orderLayer.clearLayers();
       openedOrderKey = prevOpenedKey;
+      lastOrders = Array.isArray(orders) ? orders : [];
 
       const points = [];
       let markerToReopen = null;
@@ -1366,6 +1979,8 @@
         const code = order.code ?? "?";
         const status = order.status ?? "";
         const orderKey = getOrderKey(order);
+        const isInRoute = routeOrderKeys.includes(orderKey);
+        const routeBtnText = isInRoute ? "➖ Bỏ khỏi lộ trình" : "➕ Thêm vào lộ trình";
 
         const icon = L.divIcon({
           className: "",
@@ -1407,6 +2022,9 @@
             ${noteHtml}
             ${renderOrderItems(order.items)}
             <div class="popup-line">Tổng: ${escapeHtml(formatEuro(order.total))}</div>
+            <button type="button" class="btn-toggle-route ${isInRoute ? 'in-route' : ''}" data-order-key="${escapeHtml(orderKey)}" onclick="toggleOrderInRoute('${escapeHtml(orderKey)}')">
+              ${routeBtnText}
+            </button>
           </div>
         `;
 
@@ -1445,9 +2063,334 @@
       }
       isRefreshingOrders = false;
 
+      renderRoutePanelUi();
+      calculateAndDrawRoute();
+
       els.orderCount.textContent = String(orders.length);
       els.orderSummary.classList.toggle("has-orders", orders.length >= 1);
       els.orderSummary.classList.toggle("no-orders", orders.length === 0);
+    }
+
+    // ===== MULTI-STOP ROUTE PLANNER CORE =====
+    const routeLayerGroup = L.layerGroup().addTo(map);
+    let routeOrderKeys = [];
+    let routeStartType = "restaurant";
+    let routeReturnToShop = true;
+    let routePolylineOutline = null;
+    let routePolylineInner = null;
+
+    function updateRouteBadge() {
+      const count = routeOrderKeys.length;
+      if (els.routeBadge) {
+        els.routeBadge.textContent = String(count);
+        els.routeBadge.classList.toggle("hidden", count === 0);
+      }
+      if (els.routeStopCount) {
+        els.routeStopCount.textContent = `${count} đơn`;
+      }
+      if (els.routeFitViewBtn) {
+        els.routeFitViewBtn.disabled = count === 0;
+      }
+      if (els.routeClearBtn) {
+        els.routeClearBtn.disabled = count === 0;
+      }
+    }
+
+    function toggleRoutePanel(forceState) {
+      if (!els.routePanel) return;
+      const willShow = typeof forceState === "boolean" ? forceState : !els.routePanel.classList.contains("show");
+      els.routePanel.classList.toggle("show", willShow);
+      if (els.routeButton) {
+        els.routeButton.classList.toggle("active", willShow);
+      }
+      if (willShow) {
+        if (els.filterPanel) els.filterPanel.classList.remove("open");
+        renderRoutePanelUi();
+      }
+    }
+
+    function updateRouteStartOptions() {
+      if (!els.routeStartSelect) return;
+      const prevVal = els.routeStartSelect.value || routeStartType;
+      els.routeStartSelect.innerHTML = `
+        <option value="restaurant">🏪 Tại quán (Thai Asia SushiBar)</option>
+      `;
+
+      if (Array.isArray(lastShippers)) {
+        lastShippers.forEach(shipper => {
+          if (!isShipperVisible(shipper)) return;
+          const key = getShipperKey(shipper);
+          const name = shipper?.user?.name || shipper?.name || "Shipper";
+          const online = shipper?.is_online === true;
+          const opt = document.createElement("option");
+          opt.value = `shipper:${key}`;
+          opt.textContent = `🚗 ${name} (${online ? "Online" : "Offline"})`;
+          els.routeStartSelect.appendChild(opt);
+        });
+      }
+
+      if (els.routeStartSelect.querySelector(`option[value="${prevVal}"]`)) {
+        els.routeStartSelect.value = prevVal;
+      } else {
+        els.routeStartSelect.value = "restaurant";
+        routeStartType = "restaurant";
+      }
+    }
+
+    function renderRoutePanelUi() {
+      updateRouteStartOptions();
+      updateRouteBadge();
+
+      if (!els.routeStopsList) return;
+      els.routeStopsList.innerHTML = "";
+
+      if (!routeOrderKeys.length) {
+        els.routeStopsList.innerHTML = `
+          <div class="route-empty-hint">Chưa chọn đơn nào.<br>Bấm <b>➕ Lộ trình</b> trong chi tiết đơn để thêm.</div>
+        `;
+        if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
+      } else {
+        routeOrderKeys.forEach((key, index) => {
+          const order = lastOrders.find(o => getOrderKey(o) === key);
+          const code = order?.code ?? key;
+          const addr = order ? formatOrderAddress(order) : "";
+
+          const item = document.createElement("div");
+          item.className = "route-stop-item";
+          item.innerHTML = `
+            <div class="route-stop-num">${index + 1}</div>
+            <div class="route-stop-info">
+              <div class="route-stop-name">Đơn #${escapeHtml(code)}</div>
+              ${addr ? `<div class="route-stop-addr">${escapeHtml(addr)}</div>` : ""}
+            </div>
+            <div class="route-stop-btns">
+              ${index > 0 ? `<button class="route-stop-btn" type="button" title="Lên" onclick="moveRouteOrder(${index}, -1)">▲</button>` : ""}
+              ${index < routeOrderKeys.length - 1 ? `<button class="route-stop-btn" type="button" title="Xuống" onclick="moveRouteOrder(${index}, 1)">▼</button>` : ""}
+              <button class="route-stop-btn delete" type="button" title="Xóa" onclick="removeRouteOrder(${index})">✕</button>
+            </div>
+          `;
+          els.routeStopsList.appendChild(item);
+        });
+      }
+
+      if (els.routeQuickAddRow && els.routeQuickChips) {
+        const remainingOrders = lastOrders.filter(o => !routeOrderKeys.includes(getOrderKey(o)));
+        if (remainingOrders.length > 0) {
+          els.routeQuickAddRow.classList.remove("hidden");
+          els.routeQuickChips.innerHTML = "";
+          remainingOrders.forEach(o => {
+            const key = getOrderKey(o);
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "route-chip";
+            chip.textContent = `+ #${o.code ?? '?'}`;
+            chip.title = formatOrderAddress(o);
+            chip.onclick = () => {
+              toggleOrderInRoute(key);
+            };
+            els.routeQuickChips.appendChild(chip);
+          });
+        } else {
+          els.routeQuickAddRow.classList.add("hidden");
+        }
+      }
+    }
+
+    window.toggleOrderInRoute = function (orderKey) {
+      if (!orderKey) return;
+      const idx = routeOrderKeys.indexOf(orderKey);
+      if (idx >= 0) {
+        routeOrderKeys.splice(idx, 1);
+      } else {
+        routeOrderKeys.push(orderKey);
+      }
+      renderRoutePanelUi();
+      calculateAndDrawRoute();
+      document.querySelectorAll(`.btn-toggle-route[data-order-key="${orderKey}"]`).forEach(btn => {
+        const inRoute = routeOrderKeys.includes(orderKey);
+        btn.classList.toggle("in-route", inRoute);
+        btn.innerHTML = inRoute ? "➖ Bỏ khỏi lộ trình" : "➕ Thêm vào lộ trình";
+      });
+    };
+
+    window.moveRouteOrder = function (index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= routeOrderKeys.length) return;
+      const temp = routeOrderKeys[index];
+      routeOrderKeys[index] = routeOrderKeys[target];
+      routeOrderKeys[target] = temp;
+      renderRoutePanelUi();
+      calculateAndDrawRoute();
+    };
+
+    window.removeRouteOrder = function (index) {
+      if (index >= 0 && index < routeOrderKeys.length) {
+        const removedKey = routeOrderKeys.splice(index, 1)[0];
+        renderRoutePanelUi();
+        calculateAndDrawRoute();
+        document.querySelectorAll(`.btn-toggle-route[data-order-key="${removedKey}"]`).forEach(btn => {
+          btn.classList.remove("in-route");
+          btn.innerHTML = "➕ Thêm vào lộ trình";
+        });
+      }
+    };
+
+    function clearRoute() {
+      routeOrderKeys = [];
+      routeLayerGroup.clearLayers();
+      routePolylineOutline = null;
+      routePolylineInner = null;
+      renderRoutePanelUi();
+      if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
+      document.querySelectorAll(".btn-toggle-route").forEach(btn => {
+        btn.classList.remove("in-route");
+        btn.innerHTML = "➕ Thêm vào lộ trình";
+      });
+    }
+
+    function fitRouteView() {
+      if (routePolylineOutline) {
+        map.fitBounds(routePolylineOutline.getBounds(), {
+          padding: [60, 60],
+          maxZoom: 16
+        });
+      }
+    }
+
+    async function calculateAndDrawRoute() {
+      if (!routeOrderKeys.length) {
+        routeLayerGroup.clearLayers();
+        routePolylineOutline = null;
+        routePolylineInner = null;
+        if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
+        return;
+      }
+
+      const waypoints = [];
+      const waypointLabels = [];
+
+      // 1. Start point
+      if (routeStartType.startsWith("shipper:")) {
+        const shipperKey = routeStartType.replace("shipper:", "");
+        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+        const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
+        const sLng = toNumber(shipper?.longitude ?? shipper?.lng ?? shipper?.lon);
+        if (sLat !== null && sLng !== null) {
+          waypoints.push([sLng, sLat]);
+          waypointLabels.push(shipper?.user?.name || shipper?.name || "Shipper");
+        } else {
+          waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
+          waypointLabels.push("Tại quán");
+        }
+      } else {
+        waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
+        waypointLabels.push("Tại quán");
+      }
+
+      // 2. Ordered delivery stops
+      routeOrderKeys.forEach((key, i) => {
+        const order = lastOrders.find(o => getOrderKey(o) === key);
+        if (order) {
+          const oLat = toNumber(order.latitude);
+          const oLng = toNumber(order.longitude);
+          if (oLat !== null && oLng !== null) {
+            waypoints.push([oLng, oLat]);
+            waypointLabels.push(`Đơn #${order.code ?? (i + 1)}`);
+          }
+        }
+      });
+
+      // 3. Return to restaurant
+      if (routeReturnToShop && waypoints.length >= 2) {
+        waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
+        waypointLabels.push("Về Quán");
+      }
+
+      if (waypoints.length < 2) return;
+
+      try {
+        const coordsStr = waypoints.map(pt => `${pt[0]},${pt[1]}`).join(";");
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (!data || data.code !== "Ok" || !Array.isArray(data.routes) || !data.routes.length) {
+          throw new Error("Không tìm thấy lộ trình");
+        }
+
+        const route = data.routes[0];
+        routeLayerGroup.clearLayers();
+
+        const latLngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+        routePolylineOutline = L.polyline(latLngs, {
+          color: "#ffffff",
+          weight: 8,
+          opacity: 0.95,
+          lineJoin: "round",
+          lineCap: "round"
+        }).addTo(routeLayerGroup);
+
+        routePolylineInner = L.polyline(latLngs, {
+          color: "#0284c7",
+          weight: 5,
+          opacity: 0.95,
+          lineJoin: "round",
+          lineCap: "round"
+        }).addTo(routeLayerGroup);
+
+        // Add numbered waypoint badges on map
+        routeOrderKeys.forEach((key, idx) => {
+          const order = lastOrders.find(o => getOrderKey(o) === key);
+          if (order) {
+            const lat = toNumber(order.latitude);
+            const lng = toNumber(order.longitude);
+            if (lat !== null && lng !== null) {
+              const badgeIcon = L.divIcon({
+                className: "",
+                html: `<div class="waypoint-badge-marker">${idx + 1}</div>`,
+                iconSize: [22, 22],
+                iconAnchor: [11, 28]
+              });
+              L.marker([lat, lng], {
+                icon: badgeIcon,
+                zIndexOffset: 3000
+              }).addTo(routeLayerGroup);
+            }
+          }
+        });
+
+        const totalDistKm = (route.distance / 1000).toFixed(1);
+        const totalMins = Math.round(route.duration / 60);
+        const totalTimeStr = totalMins < 60 ? `~${totalMins} phút` : `~${Math.floor(totalMins / 60)}g${totalMins % 60}p`;
+
+        if (els.routeTotalDist) els.routeTotalDist.textContent = `${totalDistKm} km`;
+        if (els.routeTotalTime) els.routeTotalTime.textContent = totalTimeStr;
+
+        if (els.routeLegsList && Array.isArray(route.legs)) {
+          els.routeLegsList.innerHTML = "";
+          route.legs.forEach((leg, idx) => {
+            const fromLabel = waypointLabels[idx] || `Điểm ${idx + 1}`;
+            const toLabel = waypointLabels[idx + 1] || `Điểm ${idx + 2}`;
+            const legDist = leg.distance < 1000 ? `${Math.round(leg.distance)}m` : `${(leg.distance / 1000).toFixed(1)}km`;
+            const legMins = Math.max(1, Math.round(leg.duration / 60));
+
+            const row = document.createElement("div");
+            row.className = "route-leg-row";
+            row.innerHTML = `
+              <span>${escapeHtml(fromLabel)} ➔ ${escapeHtml(toLabel)}</span>
+              <b>${legDist} (~${legMins}p)</b>
+            `;
+            els.routeLegsList.appendChild(row);
+          });
+        }
+
+        if (els.routeSummaryBox) els.routeSummaryBox.classList.remove("hidden");
+      } catch (err) {
+        console.warn("Lỗi tính lộ trình:", err);
+      }
     }
 
     function getShipperKey(shipper) {
@@ -1980,6 +2923,10 @@
       renderShipperStatus(shippers);
       renderShipperFilter(shippers);
       renderShippers(shippers);
+      if (typeof updateRouteStartOptions === "function") updateRouteStartOptions();
+      if (typeof calculateAndDrawRoute === "function" && routeStartType.startsWith("shipper:") && routeOrderKeys.length > 0) {
+        calculateAndDrawRoute();
+      }
 
       return shippers;
     }
