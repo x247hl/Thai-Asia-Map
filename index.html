@@ -1030,8 +1030,13 @@
     .route-suggestion-banner {
       position: fixed;
       top: calc(10px + env(safe-area-inset-top));
-      left: 50%;
-      transform: translateX(-50%);
+      left: 10px;
+      right: 10px;
+      width: fit-content;
+      max-width: min(calc(100vw - 20px), 520px);
+      margin-left: auto;
+      margin-right: auto;
+      transform: none;
       z-index: 1050;
       background: #ffffff;
       backdrop-filter: blur(16px);
@@ -1043,8 +1048,6 @@
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      width: max-content;
-      max-width: min(calc(100vw - 200px), 520px);
       box-sizing: border-box;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       user-select: none;
@@ -1109,13 +1112,13 @@
       100% {
         box-shadow: 0 4px 18px rgba(255, 122, 0, 0.32), 0 0 0 1.5px rgba(255, 122, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.14);
         border-color: #f91d04;
-        transform: translateX(-50%) scale(1);
+        transform: scale(1);
       }
 
       50% {
         box-shadow: 0 8px 30px rgba(255, 122, 0, 0.58), 0 0 0 3.5px rgba(255, 122, 0, 0.55), 0 12px 32px rgba(0, 0, 0, 0.18);
         border-color: #ff5500;
-        transform: translateX(-50%) scale(1.02);
+        transform: scale(1.4);
       }
     }
 
@@ -1125,45 +1128,12 @@
       100% {
         box-shadow: 0 4px 18px rgba(22, 163, 74, 0.28), 0 0 0 1.5px rgba(22, 163, 74, 0.4), 0 8px 24px rgba(0, 0, 0, 0.12);
         border-color: #16a34a;
-        transform: translateX(-50%) scale(1);
-      }
-
-      50% {
-        box-shadow: 0 6px 26px rgba(22, 163, 74, 0.48), 0 0 0 3px rgba(22, 163, 74, 0.5), 0 10px 28px rgba(0, 0, 0, 0.16);
-        border-color: #15803d;
-        transform: translateX(-50%) scale(1.015);
-      }
-    }
-
-    @keyframes suggestionPulseGlowMobile {
-
-      0%,
-      100% {
-        box-shadow: 0 4px 18px rgba(255, 122, 0, 0.32), 0 0 0 1.5px rgba(255, 122, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.14);
-        border-color: #f91d04;
         transform: scale(1);
       }
 
       50% {
-        box-shadow: 0 8px 30px rgba(255, 122, 0, 0.58), 0 0 0 3.5px rgba(255, 122, 0, 0.55), 0 12px 32px rgba(0, 0, 0, 0.18);
-        border-color: #ff5500;
-        transform: scale(1.5);
-      }
-    }
-
-    @keyframes optimalPulseGlowMobile {
-
-      0%,
-      100% {
-        box-shadow: 0 4px 18px rgba(22, 163, 74, 0.28), 0 0 0 1.5px rgba(22, 163, 74, 0.4), 0 8px 24px rgba(0, 0, 0, 0.12);
-        border-color: #16a34a;
-        transform: scale(1);
-      }
-
-      50% {
-        box-shadow: 0 6px 26px rgba(22, 163, 74, 0.48), 0 0 0 3px rgba(22, 163, 74, 0.5), 0 10px 28px rgba(0, 0, 0, 0.16);
-        border-color: #15803d;
-        transform: scale(1.015);
+        box-shadow: 0 6px 26px rgba(243, 60, 5, 0.48) 3px rgba(22, 163, 74, 0.5), 0 10px 28px rgba(0, 0, 0, 0.16);
+        border-color: rgb(0, 255, 89) transform: scale(1.15);
       }
     }
 
@@ -1302,25 +1272,13 @@
       transform: scale(0.95) !important;
     }
 
-    /* Mobile & Portrait Responsive Overrides */
+    /* Responsive Mobile & Portrait Position Adjustments */
     @media (max-width: 640px),
     (orientation: portrait) and (max-width: 896px) {
       .route-suggestion-banner {
-        top: calc(52px + env(safe-area-inset-top)) !important;
-        left: 10px !important;
-        right: 10px !important;
-        width: fit-content !important;
-        max-width: calc(100vw - 20px) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        transform: none !important;
-        padding: 5px 10px !important;
-        gap: 6px !important;
-        animation: suggestionPulseGlowMobile 2.4s ease-in-out infinite !important;
-      }
-
-      .route-suggestion-banner.optimal {
-        animation: optimalPulseGlowMobile 3s ease-in-out infinite !important;
+        top: calc(52px + env(safe-area-inset-top));
+        padding: 5px 10px;
+        gap: 6px;
       }
     }
 
@@ -1599,7 +1557,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v81</span>
+      <span style="font-weight: 700; color: #7c3aed;">v82</span>
     </div>
   </div>
 
