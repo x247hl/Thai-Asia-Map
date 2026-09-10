@@ -1401,6 +1401,18 @@
       <input id="showTraffic" type="checkbox" checked />
     </label>
 
+    <div class="field-label" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+      <span>Google Routes API Key</span>
+      <span id="googleApiKeyBadge" style="font-size: 10px; font-weight: 700; color: #64748b;">(OSRM)</span>
+    </div>
+    <div style="display: flex; gap: 4px; align-items: center;">
+      <input id="googleApiKeyInput" type="password" placeholder="Dán khóa AIzaSy... tại đây"
+        style="flex: 1; height: 30px; font-size: 11px; padding: 0 8px; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; background: #fff;" />
+      <button id="saveGoogleApiKeyBtn" type="button"
+        style="height: 30px; padding: 0 10px; font-size: 11px; font-weight: 700; background: #7c3aed; color: #fff; border: 0; border-radius: 6px; cursor: pointer; white-space: nowrap;">Lưu</button>
+    </div>
+    <div id="googleApiKeyStatus" style="font-size: 10.5px; margin-top: 3px; color: #64748b;">Chưa nhập key (tự động dùng OSRM miễn phí)</div>
+
     <div class="setting-shipper-list">
       <div class="shipper-list-title">Tất cả shipper</div>
       <div id="shipperSettingList">
@@ -1415,7 +1427,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v62</span>
+      <span style="font-weight: 700; color: #7c3aed;">v65</span>
     </div>
   </div>
 
@@ -1647,8 +1659,62 @@
       currentZoom: document.getElementById("currentZoom"),
       shipperStatusList: document.getElementById("shipperStatusList"),
       shipperSettingList: document.getElementById("shipperSettingList"),
+      googleApiKeyInput: document.getElementById("googleApiKeyInput"),
+      saveGoogleApiKeyBtn: document.getElementById("saveGoogleApiKeyBtn"),
+      googleApiKeyStatus: document.getElementById("googleApiKeyStatus"),
+      googleApiKeyBadge: document.getElementById("googleApiKeyBadge"),
       lastUpdate: document.getElementById("lastUpdate")
     };
+
+    const DEFAULT_GOOGLE_ROUTES_API_KEY = "AIzaSyBCB0wI2tOTlRVbj_bSQ43cWzHfAlgPBy0";
+    const GOOGLE_ROUTES_KEY_STORAGE = "thaiasia.googleRoutesApiKey";
+    let googleRoutesApiKey = localStorage.getItem(GOOGLE_ROUTES_KEY_STORAGE) || DEFAULT_GOOGLE_ROUTES_API_KEY;
+
+    function updateGoogleApiKeyUi() {
+      if (!els.googleApiKeyInput) return;
+      els.googleApiKeyInput.value = googleRoutesApiKey || "";
+      const hasKey = Boolean(googleRoutesApiKey && googleRoutesApiKey.trim().length > 10);
+      if (els.googleApiKeyBadge) {
+        els.googleApiKeyBadge.textContent = hasKey ? "🟢 Live Traffic" : "(OSRM)";
+        els.googleApiKeyBadge.style.color = hasKey ? "#16a34a" : "#64748b";
+      }
+      if (els.googleApiKeyStatus) {
+        if (hasKey) {
+          const keyTrim = googleRoutesApiKey.trim();
+          const isCustom = Boolean(localStorage.getItem(GOOGLE_ROUTES_KEY_STORAGE));
+          const masked = keyTrim.length > 10 ? (keyTrim.slice(0, 6) + "..." + keyTrim.slice(-4)) : keyTrim;
+          els.googleApiKeyStatus.innerHTML = `<span style="color:#16a34a; font-weight:700;">Đã bật Live Traffic (${escapeHtml(masked)})${isCustom ? " [Tùy chỉnh]" : " [Mặc định]"}</span>`;
+        } else {
+          els.googleApiKeyStatus.innerHTML = `<span style="color:#64748b;">Chưa nhập key (tự động dùng OSRM miễn phí)</span>`;
+        }
+      }
+    }
+
+    if (els.saveGoogleApiKeyBtn && els.googleApiKeyInput) {
+      els.saveGoogleApiKeyBtn.addEventListener("click", () => {
+        const val = (els.googleApiKeyInput.value || "").trim();
+        if (val) {
+          googleRoutesApiKey = val;
+          try {
+            localStorage.setItem(GOOGLE_ROUTES_KEY_STORAGE, val);
+          } catch (e) {}
+          showToast("🔑 Đã lưu Google Routes API Key tùy chỉnh!");
+        } else {
+          try {
+            localStorage.removeItem(GOOGLE_ROUTES_KEY_STORAGE);
+          } catch (e) {}
+          googleRoutesApiKey = DEFAULT_GOOGLE_ROUTES_API_KEY;
+          showToast("Đã khôi phục khóa mặc định");
+        }
+        updateGoogleApiKeyUi();
+        if (typeof googleRouteCache !== "undefined") googleRouteCache.clear();
+        if (routeOrderKeys.length > 0 || (routeStartType && routeStartType.startsWith("shipper:") && routeReturnToShop)) {
+          calculateAndDrawRoute();
+        }
+      });
+    }
+
+    updateGoogleApiKeyUi();
 
     // Khôi phục bộ lọc trạng thái và hiển thị đã lưu
     const savedStatusFilter = localStorage.getItem(STATUS_FILTER_KEY);
@@ -3868,12 +3934,132 @@
         });
       }
     }
+    // ===== GOOGLE ROUTES API CLIENT (LIVE TRAFFIC & CẤM ĐƯỜNG ⛔) =====
+    const googleRouteCache = new Map();
+
+    function decodeGooglePolyline(encoded) {
+      if (!encoded || typeof encoded !== "string") return [];
+      const points = [];
+      let index = 0, len = encoded.length;
+      let lat = 0, lng = 0;
+      while (index < len) {
+        let b, shift = 0, result = 0;
+        do {
+          b = encoded.charCodeAt(index++) - 63;
+          result |= (b & 0x1f) << shift;
+          shift += 5;
+        } while (b >= 0x20);
+        const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lat += dlat;
+
+        shift = 0;
+        result = 0;
+        do {
+          b = encoded.charCodeAt(index++) - 63;
+          result |= (b & 0x1f) << shift;
+          shift += 5;
+        } while (b >= 0x20);
+        const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lng += dlng;
+
+        points.push([lat / 1e5, lng / 1e5]);
+      }
+      return points;
+    }
+
+    async function fetchGoogleRoute(waypoints) {
+      const apiKey = (googleRoutesApiKey || "").trim();
+      if (!apiKey || apiKey.length < 10 || !Array.isArray(waypoints) || waypoints.length < 2) {
+        return null;
+      }
+
+      const cacheKey = waypoints.map(pt => `${Number(pt[0]).toFixed(5)},${Number(pt[1]).toFixed(5)}`).join("::");
+      const cached = googleRouteCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < 60000)) {
+        return cached.data;
+      }
+
+      const origin = { location: { latLng: { latitude: waypoints[0][1], longitude: waypoints[0][0] } } };
+      const destination = { location: { latLng: { latitude: waypoints[waypoints.length - 1][1], longitude: waypoints[waypoints.length - 1][0] } } };
+      const intermediates = waypoints.slice(1, -1).map(pt => ({
+        location: { latLng: { latitude: pt[1], longitude: pt[0] } }
+      }));
+
+      const payload = {
+        origin,
+        destination,
+        intermediates,
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_AWARE",
+        computeAlternativeRoutes: false,
+        languageCode: "vi",
+        units: "METRIC"
+      };
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
+        const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs.duration,routes.legs.distanceMeters"
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn("Google Routes API HTTP Error:", res.status, errText);
+          return null;
+        }
+
+        const data = await res.json();
+        if (!data?.routes || !Array.isArray(data.routes) || !data.routes.length) {
+          return null;
+        }
+
+        const gRoute = data.routes[0];
+        const encoded = gRoute.polyline?.encodedPolyline;
+        const latLngs = decodeGooglePolyline(encoded);
+        if (!latLngs.length) return null;
+
+        const totalDurationSec = parseInt(gRoute.duration, 10) || 0;
+        const totalDistanceMeters = Number(gRoute.distanceMeters) || 0;
+
+        const legs = Array.isArray(gRoute.legs) ? gRoute.legs.map(leg => ({
+          duration: parseInt(leg.duration, 10) || 0,
+          distance: Number(leg.distanceMeters) || 0
+        })) : [];
+
+        const result = {
+          provider: "google",
+          distance: totalDistanceMeters,
+          duration: totalDurationSec,
+          latLngs,
+          legs
+        };
+
+        googleRouteCache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: result
+        });
+
+        return result;
+      } catch (err) {
+        console.warn("Google Routes API request failed (chuyển sang OSRM dự phòng):", err);
+        return null;
+      }
+    }
 
     async function calculateAndDrawRoute() {
       const requestId = ++routeDrawRequestId;
-
-      const hasShipperStart = routeStartType && routeStartType.startsWith("shipper:");
-      const hasDirectShipperToShop = hasShipperStart && routeReturnToShop;
+      try {
+        const hasShipperStart = routeStartType && routeStartType.startsWith("shipper:");
+        const hasDirectShipperToShop = hasShipperStart && routeReturnToShop;
 
       if (!routeOrderKeys.length && !hasDirectShipperToShop) {
         stopRouteAnimation();
@@ -3930,43 +4116,80 @@
         return false;
       }
 
-      try {
-        const coordsStr = waypoints.map(pt => `${pt[0]},${pt[1]}`).join(";");
-        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+      let route = null;
 
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+      // 1. Thử tính lộ trình bằng Google Routes API (Live Traffic + Tự động tránh đường cấm ⛔)
+      if (googleRoutesApiKey && googleRoutesApiKey.trim().length > 10) {
+        try {
+          route = await fetchGoogleRoute(waypoints);
+        } catch (gErr) {
+          console.warn("Google Routes lỗi, chuyển sang OSRM:", gErr);
+        }
+      }
 
-        if (requestId !== routeDrawRequestId) {
+      if (requestId !== routeDrawRequestId) {
+        return false;
+      }
+
+      // 2. Tự động chuyển về OSRM nếu chưa có Key hoặc Google API bị lỗi/hết quota
+      if (!route) {
+        try {
+          const coordsStr = waypoints.map(pt => `${pt[0]},${pt[1]}`).join(";");
+          const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          if (requestId !== routeDrawRequestId) {
+            return false;
+          }
+
+          if (!data || data.code !== "Ok" || !Array.isArray(data.routes) || !data.routes.length) {
+            throw new Error("Không tìm thấy lộ trình");
+          }
+
+          const osrmRoute = data.routes[0];
+          route = {
+            provider: "osrm",
+            distance: osrmRoute.distance,
+            duration: osrmRoute.duration,
+            latLngs: osrmRoute.geometry.coordinates.map(c => [c[1], c[0]]),
+            legs: Array.isArray(osrmRoute.legs) ? osrmRoute.legs.map(leg => ({
+              distance: leg.distance,
+              duration: leg.duration
+            })) : []
+          };
+        } catch (osrmErr) {
+          console.warn("Lỗi tính lộ trình OSRM:", osrmErr);
           return false;
         }
+      }
 
-        if (!data || data.code !== "Ok" || !Array.isArray(data.routes) || !data.routes.length) {
-          throw new Error("Không tìm thấy lộ trình");
-        }
+      if (requestId !== routeDrawRequestId || !route || !Array.isArray(route.latLngs) || !route.latLngs.length) {
+        return false;
+      }
 
-        stopRouteAnimation();
-        const route = data.routes[0];
-        routeLayerGroup.clearLayers();
+      stopRouteAnimation();
+      routeLayerGroup.clearLayers();
 
-        const latLngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      const latLngs = route.latLngs;
 
-        routePolylineOutline = L.polyline(latLngs, {
-          color: "#ffffff",
-          weight: 9,
-          opacity: 0.95,
-          lineJoin: "round",
-          lineCap: "round"
-        }).addTo(routeLayerGroup);
+      routePolylineOutline = L.polyline(latLngs, {
+        color: "#ffffff",
+        weight: 9,
+        opacity: 0.95,
+        lineJoin: "round",
+        lineCap: "round"
+      }).addTo(routeLayerGroup);
 
-        routePolylineInner = L.polyline(latLngs, {
-          color: "#7c3aed",
-          weight: 5.5,
-          opacity: 0.98,
-          lineJoin: "round",
-          lineCap: "round"
-        }).addTo(routeLayerGroup);
+      routePolylineInner = L.polyline(latLngs, {
+        color: "#7c3aed",
+        weight: 5.5,
+        opacity: 0.98,
+        lineJoin: "round",
+        lineCap: "round"
+      }).addTo(routeLayerGroup);
 
         // Animated Flowing Navigation Stream along Route
         const routeFlowLine = L.polyline(latLngs, {
@@ -4106,7 +4329,11 @@
         const totalMins = Math.round(route.duration / 60);
         const totalTimeStr = totalMins < 60 ? `~${totalMins} phút` : `~${Math.floor(totalMins / 60)}g${totalMins % 60}p`;
 
-        if (els.routeTotalDist) els.routeTotalDist.textContent = `${totalDistKm} km`;
+        const providerTag = route.provider === "google"
+          ? '<span style="font-size:9.5px;color:#16a34a;font-weight:800;margin-left:4px;" title="Dữ liệu Google Live Traffic & Tự động tránh đường cấm">🟢 Live Traffic</span>'
+          : '<span style="font-size:9.5px;color:#64748b;font-weight:600;margin-left:4px;">(OSRM)</span>';
+
+        if (els.routeTotalDist) els.routeTotalDist.innerHTML = `${totalDistKm} km ${providerTag}`;
         if (els.routeTotalTime) els.routeTotalTime.textContent = totalTimeStr;
 
         if (els.routeLegsList && Array.isArray(route.legs)) {
