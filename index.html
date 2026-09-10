@@ -1033,109 +1033,155 @@
       left: 50%;
       transform: translateX(-50%);
       z-index: 1050;
-      background: linear-gradient(135deg, rgba(255, 237, 213, 0.98), rgba(255, 255, 255, 0.98));
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 2px solid #f97316;
+      background: #ffffff;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 2px solid #ff7a00;
       border-radius: 24px;
-      padding: 7px 14px;
-      box-shadow: 0 10px 30px rgba(249, 115, 22, 0.34), 0 3px 10px rgba(124, 45, 18, 0.14);
+      padding: 6px 14px;
       display: flex;
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      max-width: min(calc(100vw - 140px), 420px);
+      max-width: min(calc(100vw - 140px), 440px);
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      animation: suggestionBannerSlide 0.25s ease-out;
       user-select: none;
+      overflow: hidden;
+      animation: suggestionPulseGlow 2.4s ease-in-out infinite;
+    }
+
+    .route-suggestion-banner::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+      transform: skewX(-20deg);
+      animation: bannerShimmerSweep 3.5s infinite;
+      pointer-events: none;
+      border-radius: 24px;
+    }
+
+    @keyframes bannerShimmerSweep {
+      0% { left: -100%; opacity: 0; }
+      15% { opacity: 0.9; }
+      45% { left: 200%; opacity: 0; }
+      100% { left: 200%; opacity: 0; }
+    }
+
+    @keyframes suggestionPulseGlow {
+      0%, 100% {
+        box-shadow: 0 4px 18px rgba(255, 122, 0, 0.32), 0 0 0 1.5px rgba(255, 122, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.14);
+        border-color: #ff7a00;
+        transform: translateX(-50%) scale(1);
+      }
+      50% {
+        box-shadow: 0 8px 30px rgba(255, 122, 0, 0.58), 0 0 0 3.5px rgba(255, 122, 0, 0.55), 0 12px 32px rgba(0, 0, 0, 0.18);
+        border-color: #ff5500;
+        transform: translateX(-50%) scale(1.02);
+      }
     }
 
     .route-suggestion-banner:hover {
-      transform: translateX(-50%) translateY(-1px);
-      box-shadow: 0 12px 34px rgba(249, 115, 22, 0.44), 0 4px 12px rgba(124, 45, 18, 0.18);
+      box-shadow: 0 12px 32px rgba(255, 122, 0, 0.55), 0 0 0 4px rgba(255, 122, 0, 0.6);
       border-color: #ea580c;
     }
 
     .route-suggestion-banner.hidden {
-      display: none;
+      display: none !important;
     }
 
     .route-suggestion-banner.optimal {
       border-color: #16a34a;
-      background: linear-gradient(135deg, rgba(220, 252, 231, 0.98), rgba(255, 255, 255, 0.98));
-      box-shadow: 0 10px 28px rgba(22, 163, 74, 0.34), 0 3px 10px rgba(20, 83, 45, 0.14);
+      background: #ffffff;
+      animation: optimalPulseGlow 3s ease-in-out infinite;
       cursor: default;
     }
 
-    @keyframes suggestionBannerSlide {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-12px);
+    @keyframes optimalPulseGlow {
+      0%, 100% {
+        box-shadow: 0 4px 18px rgba(22, 163, 74, 0.28), 0 0 0 1.5px rgba(22, 163, 74, 0.4), 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: #16a34a;
+        transform: translateX(-50%) scale(1);
       }
-
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
+      50% {
+        box-shadow: 0 6px 26px rgba(22, 163, 74, 0.48), 0 0 0 3px rgba(22, 163, 74, 0.5), 0 10px 28px rgba(0, 0, 0, 0.16);
+        border-color: #15803d;
+        transform: translateX(-50%) scale(1.015);
       }
-    }
-
-    .suggestion-icon {
-      font-size: 17px;
-      flex-shrink: 0;
     }
 
     .suggestion-content {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       font-size: 13px;
-      color: #7c2d12;
+      color: #0f172a;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      z-index: 1;
     }
 
     .suggestion-label {
-      font-weight: 900;
-      color: #c2410c;
+      font-weight: 800;
+      color: #ea580c;
+      letter-spacing: -0.2px;
     }
 
     .route-suggestion-banner.optimal .suggestion-label {
-      color: #15803d;
+      color: #16a34a;
     }
 
     .suggestion-path {
-      font-weight: 900;
-      color: #9a3412;
+      font-weight: 800;
+      color: #0f172a;
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
+      z-index: 1;
     }
 
     .route-suggestion-banner.optimal .suggestion-path {
-      color: #166534;
+      color: #0f172a;
     }
 
     .suggestion-order-tag {
-      background: #fff7ed;
-      color: #c2410c;
-      border: 1px solid #fdba74;
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-weight: 900;
-      font-size: 12px;
+      background: #ffffff;
+      color: #ea580c;
+      border: 1.5px solid #fdba74;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 12.5px;
+      box-shadow: 0 1px 4px rgba(234, 88, 12, 0.16);
+      transition: transform 0.15s;
+    }
+
+    .suggestion-order-tag:hover {
+      transform: scale(1.08);
     }
 
     .route-suggestion-banner.optimal .suggestion-order-tag {
-      background: #f0fdf4;
-      color: #15803d;
-      border-color: #86efac;
+      background: #ffffff;
+      color: #16a34a;
+      border: 1.5px solid #86efac;
+      box-shadow: 0 1px 4px rgba(22, 163, 74, 0.16);
     }
 
     .suggestion-arrow {
       color: #ea580c;
       font-size: 12px;
       margin: 0 1px;
+      display: inline-block;
+      animation: arrowNudge 1.6s ease-in-out infinite;
+    }
+
+    @keyframes arrowNudge {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(2px); }
     }
 
     .route-suggestion-banner.optimal .suggestion-arrow {
@@ -1143,30 +1189,43 @@
     }
 
     .suggestion-apply-btn {
-      height: 24px;
-      padding: 0 11px;
-      background: linear-gradient(135deg, #f97316, #dc2626);
+      height: 25px;
+      padding: 0 12px;
+      background: linear-gradient(135deg, #ff7a00, #dc2626);
       color: #ffffff;
       border: 0;
       border-radius: 12px;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 11.5px;
+      font-weight: 800;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       white-space: nowrap;
       flex-shrink: 0;
-      transition: transform 0.15s, box-shadow 0.15s;
+      z-index: 2;
+      animation: applyBtnGlowPulse 1.8s ease-in-out infinite;
+      transition: transform 0.15s;
+    }
+
+    @keyframes applyBtnGlowPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4), 0 0 0 0 rgba(255, 122, 0, 0.5);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 4px 14px rgba(220, 38, 38, 0.65), 0 0 0 3.5px rgba(255, 122, 0, 0.28);
+      }
     }
 
     .suggestion-apply-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 3px 10px rgba(220, 38, 38, 0.38);
+      transform: scale(1.1) !important;
+      box-shadow: 0 4px 16px rgba(220, 38, 38, 0.65) !important;
     }
 
     .suggestion-apply-btn:active {
-      transform: scale(0.95);
+      transform: scale(0.95) !important;
     }
 
     /* Floating Toast Feedback */
@@ -1321,7 +1380,6 @@
 
   <div id="routeSuggestionBanner" class="route-suggestion-banner hidden" onclick="applySuggestedRouteOrder()"
     title="Bấm để áp dụng gợi ý xếp đơn này">
-    <div class="suggestion-icon">💡</div>
     <div class="suggestion-content">
       <span id="suggestionLabel" class="suggestion-label">Gợi ý xếp đơn:</span>
       <span id="suggestionPath" class="suggestion-path">—</span>
@@ -1425,7 +1483,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v72</span>
+      <span style="font-weight: 700; color: #7c3aed;">v77</span>
     </div>
   </div>
 
@@ -1677,7 +1735,7 @@
         const enabled = els.enableLiveRouting.checked;
         try {
           localStorage.setItem(ENABLE_LIVE_ROUTING_KEY, enabled ? "1" : "0");
-        } catch (e) {}
+        } catch (e) { }
         showToast(enabled ? "🟢 Đã bật định tuyến Live Traffic (Google)" : "⚪ Đã chuyển sang định tuyến OSRM");
         if (typeof googleRouteCache !== "undefined") googleRouteCache.clear();
         if (routeOrderKeys.length > 0 || (routeStartType && routeStartType.startsWith("shipper:") && routeReturnToShop)) {
@@ -1697,7 +1755,7 @@
         const enabled = els.showOrderDetails.checked;
         try {
           localStorage.setItem(SHOW_ORDER_DETAILS_KEY, enabled ? "1" : "0");
-        } catch (e) {}
+        } catch (e) { }
         showToast(enabled ? "📋 Đã bật hiện chi tiết đơn khi bấm" : "⚡ Đã bật chọn ghép đơn nhanh (bỏ qua popup & zoom)");
       });
     }
@@ -2727,6 +2785,12 @@
         return;
       }
 
+      // Khi có từ 2 đơn trở lên (bảng Gợi ý xếp đơn phía trên xuất hiện), tắt thanh panel dưới đi
+      if (routeOrderKeys.length >= 2) {
+        hideToast();
+        return;
+      }
+
       let msg = "";
       if (routeStartType && routeStartType.startsWith("shipper:")) {
         const shipperKey = routeStartType.replace("shipper:", "");
@@ -2739,8 +2803,6 @@
           const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
           const ordCode = ord?.code ? ` #${ord.code}` : "";
           msg = routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ Đơn${ordCode} ➔ Về Quán!` : `🚗 Đã nối: ${shipperName} ➔ Đơn${ordCode}!`;
-        } else {
-          msg = routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ ${routeOrderKeys.length} đơn ➔ Về Quán!` : `🚗 Đã nối: ${shipperName} ➔ ${routeOrderKeys.length} đơn!`;
         }
       } else if (routeStartType === "restaurant") {
         if (routeOrderKeys.length === 0) {
@@ -2749,17 +2811,11 @@
           const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
           const ordCode = ord?.code ? ` #${ord.code}` : "";
           msg = routeReturnToShop ? `🏪 Đã nối: Quán ➔ Đơn${ordCode} ➔ Về Quán!` : `🏪 Đã nối: Quán ➔ Đơn${ordCode}!`;
-        } else {
-          msg = routeReturnToShop ? `🏪 Đã nối: Quán ➔ ${routeOrderKeys.length} đơn ➔ Về Quán!` : `🏪 Đã nối: Quán ➔ ${routeOrderKeys.length} đơn!`;
         }
-      } else if (routeOrderKeys.length > 0) {
-        if (routeOrderKeys.length === 1) {
-          const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
-          const ordCode = ord?.code ? ` #${ord.code}` : "";
-          msg = `📍 Đã chọn Đơn${ordCode} (Chờ chọn tiếp)`;
-        } else {
-          msg = `📍 Đã chọn ${routeOrderKeys.length} đơn`;
-        }
+      } else if (routeOrderKeys.length === 1) {
+        const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
+        const ordCode = ord?.code ? ` #${ord.code}` : "";
+        msg = `📍 Đã chọn Đơn${ordCode} (Chờ chọn tiếp)`;
       }
 
       if (msg) {
@@ -3684,7 +3740,7 @@
       els.suggestionPath.innerHTML = pathHtml;
 
       if (isSame) {
-        els.suggestionLabel.textContent = "✅ Lộ Trình Tốt Nhất:";
+        els.suggestionLabel.textContent = "Lộ Trình Tốt Nhất:";
         els.routeSuggestionBanner.classList.add("optimal");
         if (els.suggestionApplyBtn) els.suggestionApplyBtn.style.display = "none";
       } else {
@@ -3878,7 +3934,7 @@
         showToast("Đã nối Quán ở đầu và cuối lộ trình!");
         return;
       }
-      showToast("✨ Đã áp dụng gợi ý và nối Quán đầu/cuối!");
+      showToast("✨ Đã áp dụng gợi ý 👍👍👍");
     };
 
     window.optimizeRouteOrders = async function () {
@@ -4168,137 +4224,137 @@
         const hasShipperStart = routeStartType && routeStartType.startsWith("shipper:");
         const hasDirectShipperToShop = hasShipperStart && routeReturnToShop;
 
-      if (!routeOrderKeys.length && !hasDirectShipperToShop) {
-        stopRouteAnimation();
-        routeLayerGroup.clearLayers();
-        routePolylineOutline = null;
-        routePolylineInner = null;
-        if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
-        return false;
-      }
-
-      const waypoints = [];
-      const waypointLabels = [];
-
-      // 1. Điểm xuất phát (Shipper hoặc Quán)
-      if (hasShipperStart) {
-        const shipperKey = routeStartType.replace("shipper:", "");
-        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
-        const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
-        const sLng = toNumber(shipper?.longitude ?? shipper?.lng ?? shipper?.lon);
-        if (sLat !== null && sLng !== null) {
-          waypoints.push([sLng, sLat]);
-          waypointLabels.push(shipper?.user?.name || shipper?.name || "Shipper");
-        }
-      } else if (routeStartType === "restaurant") {
-        waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
-        waypointLabels.push("Tại quán");
-      }
-
-      // 2. Các điểm đơn hàng
-      routeOrderKeys.forEach((key, i) => {
-        const order = lastOrders.find(o => getOrderKey(o) === key);
-        if (order) {
-          const oLat = toNumber(order.latitude);
-          const oLng = toNumber(order.longitude);
-          if (oLat !== null && oLng !== null) {
-            waypoints.push([oLng, oLat]);
-            waypointLabels.push(`Đơn #${order.code ?? (i + 1)}`);
-          }
-        }
-      });
-
-      // 3. Điểm kết thúc về Quán (Luôn là chiều Shipper/Đơn -> Về Quán)
-      if (routeReturnToShop && waypoints.length >= 1) {
-        waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
-        waypointLabels.push("Về Quán");
-      }
-
-      if (waypoints.length < 2) {
-        stopRouteAnimation();
-        routeLayerGroup.clearLayers();
-        routePolylineOutline = null;
-        routePolylineInner = null;
-        if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
-        return false;
-      }
-
-      let route = null;
-
-      const isLiveRoutingEnabled = !els.enableLiveRouting || els.enableLiveRouting.checked;
-
-      // 1. Thử tính lộ trình bằng Google Routes API (Live Traffic + Tự động tránh đường cấm ⛔)
-      if (isLiveRoutingEnabled && googleRoutesApiKey && googleRoutesApiKey.trim().length > 10) {
-        try {
-          route = await fetchGoogleRoute(waypoints);
-        } catch (gErr) {
-          console.warn("Google Routes lỗi, chuyển sang OSRM:", gErr);
-        }
-      }
-
-      if (requestId !== routeDrawRequestId) {
-        return false;
-      }
-
-      // 2. Tự động chuyển về OSRM nếu chưa có Key hoặc Google API bị lỗi/hết quota
-      if (!route) {
-        try {
-          const coordsStr = waypoints.map(pt => `${pt[0]},${pt[1]}`).join(";");
-          const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
-
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
-
-          if (requestId !== routeDrawRequestId) {
-            return false;
-          }
-
-          if (!data || data.code !== "Ok" || !Array.isArray(data.routes) || !data.routes.length) {
-            throw new Error("Không tìm thấy lộ trình");
-          }
-
-          const osrmRoute = data.routes[0];
-          route = {
-            provider: "osrm",
-            distance: osrmRoute.distance,
-            duration: osrmRoute.duration,
-            latLngs: osrmRoute.geometry.coordinates.map(c => [c[1], c[0]]),
-            legs: Array.isArray(osrmRoute.legs) ? osrmRoute.legs.map(leg => ({
-              distance: leg.distance,
-              duration: leg.duration
-            })) : []
-          };
-        } catch (osrmErr) {
-          console.warn("Lỗi tính lộ trình OSRM:", osrmErr);
+        if (!routeOrderKeys.length && !hasDirectShipperToShop) {
+          stopRouteAnimation();
+          routeLayerGroup.clearLayers();
+          routePolylineOutline = null;
+          routePolylineInner = null;
+          if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
           return false;
         }
-      }
 
-      if (requestId !== routeDrawRequestId || !route || !Array.isArray(route.latLngs) || !route.latLngs.length) {
-        return false;
-      }
+        const waypoints = [];
+        const waypointLabels = [];
 
-      stopRouteAnimation();
-      routeLayerGroup.clearLayers();
+        // 1. Điểm xuất phát (Shipper hoặc Quán)
+        if (hasShipperStart) {
+          const shipperKey = routeStartType.replace("shipper:", "");
+          const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+          const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
+          const sLng = toNumber(shipper?.longitude ?? shipper?.lng ?? shipper?.lon);
+          if (sLat !== null && sLng !== null) {
+            waypoints.push([sLng, sLat]);
+            waypointLabels.push(shipper?.user?.name || shipper?.name || "Shipper");
+          }
+        } else if (routeStartType === "restaurant") {
+          waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
+          waypointLabels.push("Tại quán");
+        }
 
-      const latLngs = route.latLngs;
+        // 2. Các điểm đơn hàng
+        routeOrderKeys.forEach((key, i) => {
+          const order = lastOrders.find(o => getOrderKey(o) === key);
+          if (order) {
+            const oLat = toNumber(order.latitude);
+            const oLng = toNumber(order.longitude);
+            if (oLat !== null && oLng !== null) {
+              waypoints.push([oLng, oLat]);
+              waypointLabels.push(`Đơn #${order.code ?? (i + 1)}`);
+            }
+          }
+        });
 
-      routePolylineOutline = L.polyline(latLngs, {
-        color: "#ffffff",
-        weight: 9,
-        opacity: 0.95,
-        lineJoin: "round",
-        lineCap: "round"
-      }).addTo(routeLayerGroup);
+        // 3. Điểm kết thúc về Quán (Luôn là chiều Shipper/Đơn -> Về Quán)
+        if (routeReturnToShop && waypoints.length >= 1) {
+          waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
+          waypointLabels.push("Về Quán");
+        }
 
-      routePolylineInner = L.polyline(latLngs, {
-        color: "#7c3aed",
-        weight: 5.5,
-        opacity: 0.98,
-        lineJoin: "round",
-        lineCap: "round"
-      }).addTo(routeLayerGroup);
+        if (waypoints.length < 2) {
+          stopRouteAnimation();
+          routeLayerGroup.clearLayers();
+          routePolylineOutline = null;
+          routePolylineInner = null;
+          if (els.routeSummaryBox) els.routeSummaryBox.classList.add("hidden");
+          return false;
+        }
+
+        let route = null;
+
+        const isLiveRoutingEnabled = !els.enableLiveRouting || els.enableLiveRouting.checked;
+
+        // 1. Thử tính lộ trình bằng Google Routes API (Live Traffic + Tự động tránh đường cấm ⛔)
+        if (isLiveRoutingEnabled && googleRoutesApiKey && googleRoutesApiKey.trim().length > 10) {
+          try {
+            route = await fetchGoogleRoute(waypoints);
+          } catch (gErr) {
+            console.warn("Google Routes lỗi, chuyển sang OSRM:", gErr);
+          }
+        }
+
+        if (requestId !== routeDrawRequestId) {
+          return false;
+        }
+
+        // 2. Tự động chuyển về OSRM nếu chưa có Key hoặc Google API bị lỗi/hết quota
+        if (!route) {
+          try {
+            const coordsStr = waypoints.map(pt => `${pt[0]},${pt[1]}`).join(";");
+            const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (requestId !== routeDrawRequestId) {
+              return false;
+            }
+
+            if (!data || data.code !== "Ok" || !Array.isArray(data.routes) || !data.routes.length) {
+              throw new Error("Không tìm thấy lộ trình");
+            }
+
+            const osrmRoute = data.routes[0];
+            route = {
+              provider: "osrm",
+              distance: osrmRoute.distance,
+              duration: osrmRoute.duration,
+              latLngs: osrmRoute.geometry.coordinates.map(c => [c[1], c[0]]),
+              legs: Array.isArray(osrmRoute.legs) ? osrmRoute.legs.map(leg => ({
+                distance: leg.distance,
+                duration: leg.duration
+              })) : []
+            };
+          } catch (osrmErr) {
+            console.warn("Lỗi tính lộ trình OSRM:", osrmErr);
+            return false;
+          }
+        }
+
+        if (requestId !== routeDrawRequestId || !route || !Array.isArray(route.latLngs) || !route.latLngs.length) {
+          return false;
+        }
+
+        stopRouteAnimation();
+        routeLayerGroup.clearLayers();
+
+        const latLngs = route.latLngs;
+
+        routePolylineOutline = L.polyline(latLngs, {
+          color: "#ffffff",
+          weight: 9,
+          opacity: 0.95,
+          lineJoin: "round",
+          lineCap: "round"
+        }).addTo(routeLayerGroup);
+
+        routePolylineInner = L.polyline(latLngs, {
+          color: "#7c3aed",
+          weight: 5.5,
+          opacity: 0.98,
+          lineJoin: "round",
+          lineCap: "round"
+        }).addTo(routeLayerGroup);
 
         // Animated Flowing Navigation Stream along Route
         const routeFlowLine = L.polyline(latLngs, {
