@@ -1,4 +1,4 @@
-const CACHE_NAME = "thaiasia-map-v78";
+const CACHE_NAME = "thaiasia-map-v79";
 const APP_SHELL = [
   "./",
   "./index.html",
