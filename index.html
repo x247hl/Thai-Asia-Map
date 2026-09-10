@@ -1423,6 +1423,7 @@
 
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
     const REFRESH_MS = 20000;
+    const RESUME_RELOAD_MS = 1500;
 
     // Thai Asia SushiBar, Leipziger Chaussee 147, Halle (Saale)
     const RESTAURANT = {
@@ -1732,11 +1733,19 @@
       isResuming = true;
 
       try {
+        const shouldReloadOnResume = lastHiddenAt > 0 && (Date.now() - lastHiddenAt > RESUME_RELOAD_MS);
+        lastHiddenAt = 0;
+
         if ("serviceWorker" in navigator) {
           try {
             const reg = await navigator.serviceWorker.getRegistration();
             if (reg) await reg.update();
           } catch (e) {}
+        }
+
+        if (shouldReloadOnResume) {
+          window.location.reload();
+          return;
         }
 
         if (!hasSavedAccess()) {
@@ -3825,8 +3834,12 @@
       }
     });
 
-    window.addEventListener("pageshow", () => {
+    window.addEventListener("pageshow", event => {
       if (!document.hidden) {
+        if (event.persisted) {
+          window.location.reload();
+          return;
+        }
         triggerAppResume();
       }
     });
