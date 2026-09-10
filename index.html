@@ -3,7 +3,8 @@
 
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -795,6 +796,7 @@
         opacity: 0;
         transform: translateY(10px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -963,6 +965,7 @@
     .route-legs-list::-webkit-scrollbar {
       width: 3px;
     }
+
     .route-legs-list::-webkit-scrollbar-thumb {
       background: #c4b5fd;
       border-radius: 3px;
@@ -1069,6 +1072,7 @@
         opacity: 0;
         transform: translateX(-50%) translateY(-12px);
       }
+
       to {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
@@ -1315,13 +1319,15 @@
     </div>
   </div>
 
-  <div id="routeSuggestionBanner" class="route-suggestion-banner hidden" onclick="applySuggestedRouteOrder()" title="Bấm để áp dụng gợi ý xếp đơn này">
+  <div id="routeSuggestionBanner" class="route-suggestion-banner hidden" onclick="applySuggestedRouteOrder()"
+    title="Bấm để áp dụng gợi ý xếp đơn này">
     <div class="suggestion-icon">💡</div>
     <div class="suggestion-content">
       <span id="suggestionLabel" class="suggestion-label">Gợi ý xếp đơn:</span>
       <span id="suggestionPath" class="suggestion-path">—</span>
     </div>
-    <button id="suggestionApplyBtn" class="suggestion-apply-btn" type="button" onclick="event.stopPropagation(); applySuggestedRouteOrder();">Áp dụng</button>
+    <button id="suggestionApplyBtn" class="suggestion-apply-btn" type="button"
+      onclick="event.stopPropagation(); applySuggestedRouteOrder();">Áp dụng</button>
   </div>
 
   <div id="routePanel" class="route-panel">
@@ -1330,9 +1336,12 @@
     <div class="route-body">
       <div class="route-top-row">
         <div class="route-top-actions">
-          <button id="routeOptimizeBtn" class="route-mini-action-btn optimize" type="button" title="Gợi ý & tự động tối ưu thứ tự giao" disabled>✨ Tối ưu</button>
-          <button id="routeFitViewBtn" class="route-mini-action-btn primary" type="button" title="Xem toàn cảnh lộ trình" disabled>🔍 Toàn cảnh</button>
-          <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình" disabled>🗑️ Xóa</button>
+          <button id="routeOptimizeBtn" class="route-mini-action-btn optimize" type="button"
+            title="Gợi ý & tự động tối ưu thứ tự giao" disabled>✨ Tối ưu</button>
+          <button id="routeFitViewBtn" class="route-mini-action-btn primary" type="button"
+            title="Xem toàn cảnh lộ trình" disabled>🔍 Toàn cảnh</button>
+          <button id="routeClearBtn" class="route-mini-action-btn danger" type="button" title="Xóa toàn bộ lộ trình"
+            disabled>🗑️ Xóa</button>
         </div>
       </div>
 
@@ -1501,7 +1510,7 @@
         });
         ro.observe(document.documentElement);
         ro.observe(document.body);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     setTimeout(setExactMapDimensions, 50);
@@ -1567,15 +1576,30 @@
       .addTo(map);
 
     restaurantMarker.on("click", () => {
-      routeStartType = "restaurant";
-      routeReturnToShop = false;
+      // 1. Nếu đã chọn Shipper làm điểm xuất phát:
+      if (routeStartType && routeStartType.startsWith("shipper:")) {
+        routeReturnToShop = !routeReturnToShop;
+        const shipperKey = routeStartType.replace("shipper:", "");
+        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+        const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
+        showToast(routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ Đơn ➔ Về Quán!` : "Đã bỏ chặng về Quán");
+      } else if (routeStartType === "restaurant" && routeOrderKeys.length > 0) {
+        // Nếu điểm xuất phát đã là Quán và đã có đơn: toggle vòng về Quán
+        routeReturnToShop = !routeReturnToShop;
+        showToast(routeReturnToShop ? "🏪 Đã nối vòng về Quán ở cuối lộ trình!" : "Đã bỏ chặng về Quán");
+      } else {
+        // Nếu chưa chọn điểm xuất phát hoặc chưa có đơn: đặt Quán làm điểm xuất phát
+        routeStartType = "restaurant";
+        routeReturnToShop = false;
+        showToast("🏪 Đã chọn Quán làm điểm xuất phát!");
+      }
+
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
       updateRouteReadyOrderMarkerUi();
-      if (routeOrderKeys.length > 0) {
-        calculateAndDrawRoute();
-        toggleRoutePanel(true);
-      }
+      renderRoutePanelUi();
+      calculateAndDrawRoute();
+      toggleRoutePanel(true);
     });
 
     let refreshTimer = null;
@@ -1750,7 +1774,7 @@
           try {
             const reg = await navigator.serviceWorker.getRegistration();
             if (reg) await reg.update();
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (shouldReloadOnResume) {
@@ -1806,7 +1830,7 @@
             await reg.update();
           }
         }
-      } catch (e) {}
+      } catch (e) { }
       setTimeout(() => {
         window.location.reload(true);
       }, 150);
@@ -1881,7 +1905,7 @@
     els.statusFilter.addEventListener("change", () => {
       try {
         localStorage.setItem(STATUS_FILTER_KEY, els.statusFilter.value);
-      } catch (err) {}
+      } catch (err) { }
       filterAndRenderCurrentOrders();
       refreshAll(true);
     });
@@ -1890,7 +1914,7 @@
       const checked = els.showOrders.checked;
       try {
         localStorage.setItem(SHOW_ORDERS_KEY, checked ? "1" : "0");
-      } catch (err) {}
+      } catch (err) { }
       if (checked) {
         if (!map.hasLayer(orderLayer)) orderLayer.addTo(map);
       } else if (map.hasLayer(orderLayer)) {
@@ -1902,7 +1926,7 @@
       const checked = els.showShippers.checked;
       try {
         localStorage.setItem(SHOW_SHIPPERS_KEY, checked ? "1" : "0");
-      } catch (err) {}
+      } catch (err) { }
       if (checked) {
         if (!map.hasLayer(shipperLayer)) shipperLayer.addTo(map);
       } else if (map.hasLayer(shipperLayer)) {
@@ -2524,21 +2548,22 @@
 
     function updateRouteBadge() {
       const count = routeOrderKeys.length;
+      const hasDirectShipperToShop = Boolean(routeStartType && routeStartType.startsWith("shipper:") && routeReturnToShop);
       if (els.routeBadge) {
         els.routeBadge.textContent = String(count);
-        els.routeBadge.classList.toggle("hidden", count === 0);
+        els.routeBadge.classList.toggle("hidden", count === 0 && !hasDirectShipperToShop);
       }
       if (els.routeStopCount) {
-        els.routeStopCount.textContent = `${count} đơn`;
+        els.routeStopCount.textContent = count > 0 ? `${count} đơn` : (hasDirectShipperToShop ? "Về quán" : "0 đơn");
       }
       if (els.routeOptimizeBtn) {
         els.routeOptimizeBtn.disabled = count < 2;
       }
       if (els.routeFitViewBtn) {
-        els.routeFitViewBtn.disabled = count === 0;
+        els.routeFitViewBtn.disabled = count === 0 && !hasDirectShipperToShop;
       }
       if (els.routeClearBtn) {
-        els.routeClearBtn.disabled = count === 0;
+        els.routeClearBtn.disabled = count === 0 && !hasDirectShipperToShop && !routeStartType;
       }
     }
 
@@ -2673,8 +2698,7 @@
         }
       }
 
-      if (!routeStartType) return null;
-
+      // Mặc định luôn xuất phát từ Quán
       return {
         id: "__start__",
         label: "Tại quán",
@@ -2720,7 +2744,8 @@
       });
 
       let returnPointId = "__start__";
-      if (routeReturnToShop) {
+      const isReturnToShop = routeReturnToShop || !routeStartType || routeStartType === "restaurant";
+      if (isReturnToShop) {
         const isStartAtRestaurant = startPoint
           && Math.abs(startPoint.lat - RESTAURANT.lat) < 0.000001
           && Math.abs(startPoint.lng - RESTAURANT.lng) < 0.000001;
@@ -2839,8 +2864,8 @@
     function analyzeRouteOrderPermutation(perm, routeMatrix = null) {
       let startLat = RESTAURANT.lat;
       let startLng = RESTAURANT.lng;
-      let startLabel = "Chưa chọn điểm xuất phát";
-      let hasFixedStart = false;
+      let startLabel = "Tại quán";
+      let hasFixedStart = true;
       if (routeMatrix?.startPoint) {
         startLat = routeMatrix.startPoint.lat;
         startLng = routeMatrix.startPoint.lng;
@@ -2970,6 +2995,7 @@
       let normalWaitPenalty = 0;
       let sequencePenalty = 0;
       const scheduledStops = [];
+      const normalStops = [];
       const stopDetails = [];
       const reasons = [];
 
@@ -3012,15 +3038,37 @@
         } else {
           const totalWaitAtDelivery = item.waitMin + arrivalFromNow;
           detail.totalWaitAtDelivery = totalWaitAtDelivery;
-          if (totalWaitAtDelivery > ROUTE_NORMAL_WAIT_TARGET_MIN) {
-            const overMin = totalWaitAtDelivery - ROUTE_NORMAL_WAIT_TARGET_MIN;
-            const penalty = Math.pow(overMin, 1.6) * 1.6;
-            totalPenalty += penalty;
-            normalWaitPenalty += penalty;
+
+          // Phạt cơ bản tuyến tính theo tổng thời gian khách đợi
+          let waitPenalty = totalWaitAtDelivery * 1.5;
+
+          // Phạt bậc 1 khi quá 45 phút
+          if (totalWaitAtDelivery > 45) {
+            const over45 = totalWaitAtDelivery - 45;
+            waitPenalty += over45 * 1.5;
+            detail.notes.push(`đơn thường chờ lâu ${formatRouteMinutes(totalWaitAtDelivery)}`);
+          } else if (totalWaitAtDelivery > ROUTE_NORMAL_WAIT_TARGET_MIN) {
             detail.notes.push(`đơn thường chờ khoảng ${formatRouteMinutes(totalWaitAtDelivery)}`);
           } else {
-            detail.notes.push(`đơn thường chưa vượt ngưỡng chờ ${ROUTE_NORMAL_WAIT_TARGET_MIN}p`);
+            detail.notes.push(`đơn thường giao nhanh ${formatRouteMinutes(totalWaitAtDelivery)}`);
           }
+
+          // Phạt cực nặng khi để đơn bị ngâm quá lâu (> 60 phút)
+          // Để thuật toán không bao giờ "bỏ rơi" đơn cũ lên tới 80-95 phút chỉ để giao đơn mới
+          if (totalWaitAtDelivery > 60) {
+            const over60 = totalWaitAtDelivery - 60;
+            waitPenalty += over60 * 2.5 + Math.pow(over60, 1.35) * 0.8;
+          }
+
+          totalPenalty += waitPenalty;
+          normalWaitPenalty += waitPenalty;
+          normalStops.push({
+            index: i,
+            waitMin: item.waitMin,
+            label: item.label,
+            legTravelMin: item.legTravelMin,
+            straightDistMeters: item.straightDistMeters
+          });
         }
         stopDetails.push(detail);
       }
@@ -3039,8 +3087,30 @@
         }
       }
 
+      // Phạt đảo thứ tự đơn thường: Nếu đơn xếp sau lại vào trước từ 12p trở lên
+      for (let j = 0; j < normalStops.length; j++) {
+        for (let k = j + 1; k < normalStops.length; k++) {
+          const earlierInRoute = normalStops[j];
+          const laterInRoute = normalStops[k];
+
+          // Nếu điểm xếp trước nằm ngay cạnh điểm liền kề trước đó (cùng cụm / tiện đường <= 4p hoặc <= 1.5km)
+          // thì việc tiện đường giao luôn đơn này không làm chậm đáng kể các đơn khác, không bị phạt đảo thứ tự.
+          const isNearbyCluster = (earlierInRoute.legTravelMin <= 4.0) || (earlierInRoute.straightDistMeters <= 1500);
+          if (isNearbyCluster) continue;
+
+          if (laterInRoute.waitMin > earlierInRoute.waitMin + 12) {
+            const diff = laterInRoute.waitMin - earlierInRoute.waitMin;
+            const penalty = (diff - 8) * 2.8;
+            totalPenalty += penalty;
+            sequencePenalty += penalty;
+            reasons.push(`${laterInRoute.label} đặt trước ${earlierInRoute.label} khoảng ${formatRouteMinutes(diff)} nhưng lại bị xếp sau`);
+          }
+        }
+      }
+
       let returnTravelMin = 0;
-      if (routeReturnToShop) {
+      const isReturnToShop = routeReturnToShop || !routeStartType || routeStartType === "restaurant";
+      if (isReturnToShop) {
         const distBack = calculateDistanceMeters(currentLat, currentLng, RESTAURANT.lat, RESTAURANT.lng);
         let estimatedBackMeters = distBack * ROUTE_ESTIMATE_DISTANCE_FACTOR;
         returnTravelMin = estimatedBackMeters / ROUTE_ESTIMATE_SPEED_M_PER_MIN;
@@ -3098,6 +3168,277 @@
       };
     }
 
+    function twoOptSwap(perm, i, k) {
+      const newPerm = [];
+      for (let c = 0; c < i; c++) newPerm.push(perm[c]);
+      for (let c = k; c >= i; c--) newPerm.push(perm[c]);
+      for (let c = k + 1; c < perm.length; c++) newPerm.push(perm[c]);
+      return newPerm;
+    }
+
+    function computeFastPermutationScore(perm, routeMatrix = null) {
+      let startLat = RESTAURANT.lat;
+      let startLng = RESTAURANT.lng;
+      if (routeMatrix?.startPoint) {
+        startLat = routeMatrix.startPoint.lat;
+        startLng = routeMatrix.startPoint.lng;
+      } else if (routeStartType && routeStartType.startsWith("shipper:")) {
+        const shipperKey = routeStartType.replace("shipper:", "");
+        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+        const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
+        const sLng = toNumber(shipper?.longitude ?? shipper?.lng ?? shipper?.lon);
+        if (sLat !== null && sLng !== null) {
+          startLat = sLat;
+          startLng = sLng;
+        }
+      }
+
+      let currentLat = startLat;
+      let currentLng = startLng;
+      let currentPointId = "__start__";
+      let totalTravelMin = 0;
+      const orderMetaList = [];
+
+      for (let i = 0; i < perm.length; i++) {
+        const key = perm[i];
+        const order = lastOrders.find(o => getOrderKey(o) === key);
+        if (!order) continue;
+        const oLat = toNumber(order.latitude);
+        const oLng = toNumber(order.longitude);
+        if (oLat === null || oLng === null) continue;
+
+        let straightDistMeters = calculateDistanceMeters(currentLat, currentLng, oLat, oLng);
+        let legTravelMin = (straightDistMeters * ROUTE_ESTIMATE_DISTANCE_FACTOR) / ROUTE_ESTIMATE_SPEED_M_PER_MIN;
+        const matrixLeg = getMatrixLeg(routeMatrix, currentPointId, key);
+        if (matrixLeg) {
+          legTravelMin = matrixLeg.travelMin;
+        }
+        totalTravelMin += legTravelMin;
+        const tripTime = totalTravelMin + i * ROUTE_STOP_SERVICE_MIN;
+        const schedule = parseOrderSchedule(order);
+        const waitMin = getOrderWaitTimeMinutes(order);
+
+        orderMetaList.push({
+          key,
+          schedule,
+          waitMin,
+          tripTime,
+          legTravelMin,
+          straightDistMeters
+        });
+
+        currentLat = oLat;
+        currentLng = oLng;
+        currentPointId = key;
+      }
+
+      let maxAllowedD = Infinity;
+      let idealD = Infinity;
+      let hasScheduled = false;
+
+      for (let i = 0; i < orderMetaList.length; i++) {
+        const item = orderMetaList[i];
+        if (item.schedule.isScheduled) {
+          hasScheduled = true;
+          const neededD = item.schedule.targetMinutesFromNow - item.tripTime;
+          if (neededD < idealD) idealD = neededD;
+        } else {
+          const limitD = Math.max(0, ROUTE_NORMAL_WAIT_LIMIT_MIN - item.waitMin - item.tripTime);
+          if (limitD < maxAllowedD) maxAllowedD = limitD;
+        }
+      }
+
+      let departureOffset = 0;
+      if (hasScheduled) {
+        departureOffset = Math.max(0, Math.min(idealD, maxAllowedD));
+        if (!Number.isFinite(departureOffset)) departureOffset = 0;
+      }
+
+      let totalPenalty = 0;
+      const scheduledStops = [];
+      const normalStops = [];
+
+      for (let i = 0; i < orderMetaList.length; i++) {
+        const item = orderMetaList[i];
+        const arrivalFromNow = departureOffset + item.tripTime;
+
+        if (item.schedule.isScheduled) {
+          const targetMin = item.schedule.targetMinutesFromNow;
+          if (arrivalFromNow < targetMin) {
+            totalPenalty += (targetMin - arrivalFromNow) * 0.2;
+          } else if (arrivalFromNow > targetMin + ROUTE_SCHEDULE_GRACE_MIN) {
+            const lateMin = arrivalFromNow - (targetMin + ROUTE_SCHEDULE_GRACE_MIN);
+            totalPenalty += Math.pow(lateMin, 2) * 5;
+          }
+          scheduledStops.push({ index: i, targetMin });
+        } else {
+          const totalWaitAtDelivery = item.waitMin + arrivalFromNow;
+          let waitPenalty = totalWaitAtDelivery * 1.5;
+          if (totalWaitAtDelivery > 45) {
+            waitPenalty += (totalWaitAtDelivery - 45) * 1.5;
+          }
+          if (totalWaitAtDelivery > 60) {
+            const over60 = totalWaitAtDelivery - 60;
+            waitPenalty += over60 * 2.5 + Math.pow(over60, 1.35) * 0.8;
+          }
+          totalPenalty += waitPenalty;
+          normalStops.push({
+            index: i,
+            waitMin: item.waitMin,
+            legTravelMin: item.legTravelMin,
+            straightDistMeters: item.straightDistMeters
+          });
+        }
+      }
+
+      for (let j = 0; j < scheduledStops.length; j++) {
+        for (let k = j + 1; k < scheduledStops.length; k++) {
+          if (scheduledStops[j].targetMin > scheduledStops[k].targetMin + 5) {
+            totalPenalty += (scheduledStops[j].targetMin - scheduledStops[k].targetMin) * 20;
+          }
+        }
+      }
+
+      for (let j = 0; j < normalStops.length; j++) {
+        for (let k = j + 1; k < normalStops.length; k++) {
+          const earlierInRoute = normalStops[j];
+          const laterInRoute = normalStops[k];
+          const isNearbyCluster = (earlierInRoute.legTravelMin <= 4.0) || (earlierInRoute.straightDistMeters <= 1500);
+          if (isNearbyCluster) continue;
+
+          if (laterInRoute.waitMin > earlierInRoute.waitMin + 12) {
+            const diff = laterInRoute.waitMin - earlierInRoute.waitMin;
+            totalPenalty += (diff - 8) * 2.8;
+          }
+        }
+      }
+
+      const isReturnToShop = routeReturnToShop || !routeStartType || routeStartType === "restaurant";
+      if (isReturnToShop) {
+        let returnTravelMin = (calculateDistanceMeters(currentLat, currentLng, RESTAURANT.lat, RESTAURANT.lng) * ROUTE_ESTIMATE_DISTANCE_FACTOR) / ROUTE_ESTIMATE_SPEED_M_PER_MIN;
+        const returnLeg = getMatrixLeg(routeMatrix, currentPointId, routeMatrix?.returnPointId || "__start__");
+        if (returnLeg) {
+          returnTravelMin = returnLeg.travelMin;
+        }
+        totalTravelMin += returnTravelMin;
+      }
+
+      return (totalTravelMin * 1.25) + totalPenalty;
+    }
+
+    function findOptimalPermutations(keys, routeMatrix) {
+      if (!Array.isArray(keys) || keys.length <= 1) return [{ perm: keys, cost: 0 }];
+      const n = keys.length;
+
+      // Nếu số lượng đơn nhỏ (<= 6 đơn = tối đa 720 hoán vị), duyệt toàn bộ hoán vị nhanh
+      if (n <= 6) {
+        const allPerms = getPermutations(keys);
+        const scored = allPerms.map(perm => ({
+          perm,
+          cost: computeFastPermutationScore(perm, routeMatrix)
+        }));
+        scored.sort((a, b) => a.cost - b.cost);
+        return scored;
+      }
+
+      // Khi số đơn >= 7: Dùng thuật toán heuristic Multi-Start 2-Opt siêu nhanh (1-2ms, không đơ lag)
+      const candidatePerms = new Map();
+
+      function addCandidate(perm) {
+        const keyStr = perm.join("|");
+        if (!candidatePerms.has(keyStr)) {
+          const cost = computeFastPermutationScore(perm, routeMatrix);
+          candidatePerms.set(keyStr, { perm: [...perm], cost });
+        }
+      }
+
+      function run2Opt(startPerm) {
+        let current = [...startPerm];
+        let currentCost = computeFastPermutationScore(current, routeMatrix);
+        let improved = true;
+        let iter = 0;
+        while (improved && iter++ < 80) {
+          improved = false;
+          for (let i = 0; i < current.length - 1; i++) {
+            for (let k = i + 1; k < current.length; k++) {
+              const swapped = twoOptSwap(current, i, k);
+              const cost = computeFastPermutationScore(swapped, routeMatrix);
+              if (cost < currentCost - 0.001) {
+                current = swapped;
+                currentCost = cost;
+                improved = true;
+                break;
+              }
+            }
+            if (improved) break;
+          }
+        }
+        addCandidate(current);
+        return current;
+      }
+
+      // Seed 1: Thứ tự hiện tại
+      run2Opt(keys);
+
+      // Seed 2: Nearest Neighbor (Tham lam theo khoảng cách từ điểm xuất phát)
+      const nnPerm = [];
+      const remaining = [...keys];
+      let currPt = "__start__";
+      while (remaining.length > 0) {
+        let bestNextIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+          const leg = getMatrixLeg(routeMatrix, currPt, remaining[i]);
+          const d = leg ? leg.travelMin : 9999;
+          if (d < bestDist) {
+            bestDist = d;
+            bestNextIdx = i;
+          }
+        }
+        const nextKey = remaining.splice(bestNextIdx, 1)[0];
+        nnPerm.push(nextKey);
+        currPt = nextKey;
+      }
+      run2Opt(nnPerm);
+
+      // Seed 3: Sắp xếp theo FIFO (Thời gian đặt đơn)
+      const fifoPerm = [...keys].sort((a, b) => {
+        const oA = lastOrders.find(o => getOrderKey(o) === a);
+        const oB = lastOrders.find(o => getOrderKey(o) === b);
+        const tA = oA?.created_at ? new Date(oA.created_at).getTime() : 0;
+        const tB = oB?.created_at ? new Date(oB.created_at).getTime() : 0;
+        return tA - tB;
+      });
+      run2Opt(fifoPerm);
+
+      // Seed 4: Ưu tiên đơn hẹn giờ trước, sau đó đến FIFO
+      const scheduleFirstPerm = [...keys].sort((a, b) => {
+        const oA = lastOrders.find(o => getOrderKey(o) === a);
+        const oB = lastOrders.find(o => getOrderKey(o) === b);
+        const sA = parseOrderSchedule(oA).isScheduled ? 1 : 0;
+        const sB = parseOrderSchedule(oB).isScheduled ? 1 : 0;
+        if (sA !== sB) return sB - sA;
+        const tA = oA?.created_at ? new Date(oA.created_at).getTime() : 0;
+        const tB = oB?.created_at ? new Date(oB.created_at).getTime() : 0;
+        return tA - tB;
+      });
+      run2Opt(scheduleFirstPerm);
+
+      // Seed 5-8: Random shuffle seeds kết hợp 2-opt
+      for (let s = 0; s < 5; s++) {
+        const shuffled = [...keys];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        run2Opt(shuffled);
+      }
+
+      const results = Array.from(candidatePerms.values());
+      results.sort((a, b) => a.cost - b.cost);
+      return results;
+    }
+
     function evaluateRouteOrderPermutation(perm) {
       return analyzeRouteOrderPermutation(perm).cost;
     }
@@ -3105,19 +3446,28 @@
     async function getRouteOptimizationAnalysis(keys) {
       if (!Array.isArray(keys) || keys.length < 2) return null;
       const routeMatrix = await fetchOsrmRouteMatrix(keys);
-      const analyses = getPermutations(keys)
-        .map(perm => analyzeRouteOrderPermutation(perm, routeMatrix))
-        .sort((a, b) => a.cost - b.cost);
+      const rankedPerms = findOptimalPermutations(keys, routeMatrix);
+      if (!rankedPerms || rankedPerms.length === 0) return null;
+
       const currentPath = keys.join("|");
-      const currentRank = analyses.findIndex(item => item.perm.join("|") === currentPath);
-      const current = currentRank >= 0 ? analyses[currentRank] : analyzeRouteOrderPermutation(keys, routeMatrix);
+      const currentRankIdx = rankedPerms.findIndex(item => item.perm.join("|") === currentPath);
+
+      // Chỉ sinh full analysis object cho Best và Top 5 alternatives + Current để tối ưu bộ nhớ và tốc độ
+      const best = analyzeRouteOrderPermutation(rankedPerms[0].perm, routeMatrix);
+      const alternatives = rankedPerms.slice(0, 5).map(item => analyzeRouteOrderPermutation(item.perm, routeMatrix));
+      const current = currentRankIdx === 0
+        ? best
+        : (currentRankIdx > 0 && currentRankIdx < 5
+          ? alternatives[currentRankIdx]
+          : analyzeRouteOrderPermutation(keys, routeMatrix));
+
       return {
-        permutationsCount: analyses.length,
-        best: analyses[0] || current,
+        permutationsCount: keys.length <= 6 ? rankedPerms.length : `${rankedPerms.length} (2-Opt / ${keys.length} đơn)`,
+        best,
         current,
-        currentRank: currentRank >= 0 ? currentRank + 1 : null,
-        alternatives: analyses.slice(0, 5),
-        all: analyses,
+        currentRank: currentRankIdx >= 0 ? currentRankIdx + 1 : null,
+        alternatives,
+        all: alternatives,
         routeMatrix
       };
     }
@@ -3335,8 +3685,10 @@
       if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
       const keysSnapshot = [...routeOrderKeys];
       showToast("Đang tính đường xe OSRM...", 1800);
-      routeStartType = "restaurant";
-      routeReturnToShop = true;
+      if (!routeStartType) {
+        routeStartType = "restaurant";
+        routeReturnToShop = true;
+      }
       routeAnalysisCache = null;
       await logRouteOptimizationDebug("apply suggested route");
       const bestPerm = await getOptimalRoutePermutation(keysSnapshot);
@@ -3520,7 +3872,10 @@
     async function calculateAndDrawRoute() {
       const requestId = ++routeDrawRequestId;
 
-      if (!routeOrderKeys.length) {
+      const hasShipperStart = routeStartType && routeStartType.startsWith("shipper:");
+      const hasDirectShipperToShop = hasShipperStart && routeReturnToShop;
+
+      if (!routeOrderKeys.length && !hasDirectShipperToShop) {
         stopRouteAnimation();
         routeLayerGroup.clearLayers();
         routePolylineOutline = null;
@@ -3532,8 +3887,8 @@
       const waypoints = [];
       const waypointLabels = [];
 
-      // 1. Start point (chỉ thêm nếu người dùng đã click chọn Shipper hoặc Quán)
-      if (routeStartType && routeStartType.startsWith("shipper:")) {
+      // 1. Điểm xuất phát (Shipper hoặc Quán)
+      if (hasShipperStart) {
         const shipperKey = routeStartType.replace("shipper:", "");
         const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
         const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
@@ -3547,7 +3902,7 @@
         waypointLabels.push("Tại quán");
       }
 
-      // 2. Ordered delivery stops
+      // 2. Các điểm đơn hàng
       routeOrderKeys.forEach((key, i) => {
         const order = lastOrders.find(o => getOrderKey(o) === key);
         if (order) {
@@ -3560,8 +3915,8 @@
         }
       });
 
-      // 3. Return to restaurant
-      if (routeReturnToShop && waypoints.length >= 2) {
+      // 3. Điểm kết thúc về Quán (Luôn là chiều Shipper/Đơn -> Về Quán)
+      if (routeReturnToShop && waypoints.length >= 1) {
         waypoints.push([RESTAURANT.lng, RESTAURANT.lat]);
         waypointLabels.push("Về Quán");
       }
@@ -3634,58 +3989,86 @@
 
         // Animate arrows directly on the route SVG path to avoid Leaflet marker jitter.
         const flowPath = routeFlowLine?._path;
-        if (totalRouteDist >= 50 && flowPath && typeof flowPath.getTotalLength === "function") {
-          const pathLengthPx = flowPath.getTotalLength();
-          const arrowParent = flowPath.parentNode;
+        if (totalRouteDist >= 50 && flowPath) {
+          const SVG_NS = "http://www.w3.org/2000/svg";
+          const SPEED_PX_PER_SEC = 50;
+          const FLOW_DASH_PATTERN_PX = 28;
+          const animationStart = performance.now();
 
-          if (pathLengthPx > 0 && arrowParent) {
-            const SVG_NS = "http://www.w3.org/2000/svg";
-            const numArrows = Math.max(2, Math.min(10, Math.round(pathLengthPx / 150)));
-            const stepPx = pathLengthPx / numArrows;
+          const getAngleAtPathPx = (path, distancePx, totalLen) => {
+            const d1 = Math.max(0, distancePx - 3);
+            const d2 = Math.min(totalLen, distancePx + 3);
+            const p1 = path.getPointAtLength(d1);
+            const p2 = path.getPointAtLength(d2 === d1 ? Math.min(totalLen, d1 + 1) : d2);
+            return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI + 90;
+          };
 
-            for (let k = 0; k < numArrows; k++) {
+          const animateRoute = (timestamp) => {
+            if (!flowPath || typeof flowPath.getTotalLength !== "function") return;
+            const parent = flowPath.parentNode;
+            if (!parent) {
+              routeAnimationId = requestAnimationFrame(animateRoute);
+              return;
+            }
+
+            let currentPathLength = 0;
+            try {
+              currentPathLength = flowPath.getTotalLength();
+            } catch (e) { }
+
+            if (currentPathLength < 30) {
+              routeAnimationId = requestAnimationFrame(animateRoute);
+              return;
+            }
+
+            // Tự động điều chỉnh số lượng mũi tên theo chiều dài pixel thực tế khi zoom to / thu nhỏ
+            // Đảm bảo ở mọi mức zoom, cả chiều đi và chiều về đều có đủ mũi tên phân bố đều
+            const desiredArrows = Math.max(2, Math.min(36, Math.round(currentPathLength / 130)));
+
+            while (movingArrowMarkers.length < desiredArrows) {
               const arrowEl = document.createElementNS(SVG_NS, "path");
               arrowEl.setAttribute("class", "route-moving-arrow-svg");
               arrowEl.setAttribute("d", "M 0 -8 L 6 7 L 0 4 L -6 7 Z");
-              arrowParent.appendChild(arrowEl);
-
-              movingArrowMarkers.push({
-                arrowEl,
-                offsetPx: k * stepPx
-              });
+              parent.appendChild(arrowEl);
+              movingArrowMarkers.push({ arrowEl });
+            }
+            while (movingArrowMarkers.length > desiredArrows) {
+              const item = movingArrowMarkers.pop();
+              if (item?.arrowEl?.parentNode) {
+                item.arrowEl.parentNode.removeChild(item.arrowEl);
+              }
             }
 
-            const SPEED_PX_PER_SEC = 75;
-            const FLOW_DASH_PATTERN_PX = 28;
-            const animationStart = performance.now();
-
-            const getAngleAtPathPx = (path, distancePx) => {
-              const d1 = Math.max(0, distancePx - 2);
-              const d2 = Math.min(pathLengthPx, distancePx + 2);
-              const p1 = path.getPointAtLength(d1);
-              const p2 = path.getPointAtLength(d2 === d1 ? Math.min(pathLengthPx, d1 + 1) : d2);
-              return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI + 90;
-            };
-
-            const animateRoute = (timestamp) => {
-              const elapsedSec = (timestamp - animationStart) / 1000;
-              const travelPx = (elapsedSec * SPEED_PX_PER_SEC) % pathLengthPx;
-              const dashOffsetPx = -(elapsedSec * SPEED_PX_PER_SEC) % FLOW_DASH_PATTERN_PX;
-              flowPath.style.strokeDashoffset = `${dashOffsetPx}px`;
-
-              for (let i = 0; i < movingArrowMarkers.length; i++) {
-                const item = movingArrowMarkers[i];
-                const distancePx = (item.offsetPx + travelPx) % pathLengthPx;
-                const p = flowPath.getPointAtLength(distancePx);
-                const angle = getAngleAtPathPx(flowPath, distancePx);
-                item.arrowEl.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(1)})`);
+            movingArrowMarkers.forEach(item => {
+              if (item.arrowEl.parentNode !== parent) {
+                parent.appendChild(item.arrowEl);
               }
+            });
 
-              routeAnimationId = requestAnimationFrame(animateRoute);
-            };
+            const elapsedSec = (timestamp - animationStart) / 1000;
+            const travelPx = (elapsedSec * SPEED_PX_PER_SEC) % currentPathLength;
+            const dashOffsetPx = -(elapsedSec * SPEED_PX_PER_SEC) % FLOW_DASH_PATTERN_PX;
+            flowPath.style.strokeDashoffset = `${dashOffsetPx}px`;
+
+            const stepPx = currentPathLength / movingArrowMarkers.length;
+            for (let i = 0; i < movingArrowMarkers.length; i++) {
+              const item = movingArrowMarkers[i];
+              const distancePx = (i * stepPx + travelPx) % currentPathLength;
+              const p = flowPath.getPointAtLength(distancePx);
+              const angle = getAngleAtPathPx(flowPath, distancePx, currentPathLength);
+
+              // Tách làn giao thông: Dạt sang phải 2.5px theo hướng chạy của từng chiều (Right-hand traffic)
+              // Giúp đoạn đường 2 chiều (đi và về) hiển thị 2 luồng mũi tên song song rõ rệt, không bị đè lên nhau
+              item.arrowEl.setAttribute(
+                "transform",
+                `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(1)}) translate(2.5, 0)`
+              );
+            }
 
             routeAnimationId = requestAnimationFrame(animateRoute);
-          }
+          };
+
+          routeAnimationId = requestAnimationFrame(animateRoute);
         }
 
         // Add 3D High-Contrast Neon numbered waypoint badges on map (Phương án 5)
@@ -3851,17 +4234,26 @@
     function focusShipper(shipper) {
       const key = getShipperKey(shipper);
       const marker = shipperMarkers.get(key);
+      const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
 
-      // Đặt shipper này làm điểm xuất phát cho lộ trình
+      const prevStartType = routeStartType;
+      // Nếu trước đó đã click Quán (routeStartType === "restaurant") hoặc đã có cờ về quán -> Luôn đi từ Shipper -> Về Quán
+      if (prevStartType === "restaurant" || routeReturnToShop) {
+        routeReturnToShop = true;
+      }
       routeStartType = `shipper:${key}`;
-      routeReturnToShop = false;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
       updateRouteReadyOrderMarkerUi();
-      if (routeOrderKeys.length > 0) {
+      renderRoutePanelUi();
+      if (routeOrderKeys.length > 0 || routeReturnToShop) {
         calculateAndDrawRoute();
         toggleRoutePanel(true);
       }
+      const toastMsg = routeReturnToShop
+        ? (routeOrderKeys.length > 0 ? `🚗 ${shipperName} ➔ Đơn ➔ Về Quán` : `🚗 ${shipperName} ➔ Về Quán`)
+        : `🚗 Đã chọn ${shipperName} làm điểm xuất phát!`;
+      showToast(toastMsg);
 
       // Nếu bấm lại vào chính shipper đang bám đuôi -> hủy bám đuôi
       if (activeFollowShipperKey === key) {
@@ -4267,15 +4659,25 @@
 
         marker.on("click", () => {
           const key = getShipperKey(shipper);
+          const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
+          const prevStartType = routeStartType;
+          // Nếu trước đó đã click Quán (routeStartType === "restaurant") hoặc đã có cờ về quán -> Luôn đi từ Shipper -> Về Quán
+          if (prevStartType === "restaurant" || routeReturnToShop) {
+            routeReturnToShop = true;
+          }
           routeStartType = `shipper:${key}`;
-          routeReturnToShop = false;
           isRoutingArmed = true;
           lastInteractedOrderKey = null;
           updateRouteReadyOrderMarkerUi();
-          if (routeOrderKeys.length > 0) {
+          renderRoutePanelUi();
+          if (routeOrderKeys.length > 0 || routeReturnToShop) {
             calculateAndDrawRoute();
             toggleRoutePanel(true);
           }
+          const toastMsg = routeReturnToShop
+            ? (routeOrderKeys.length > 0 ? `🚗 ${shipperName} ➔ Đơn ➔ Về Quán` : `🚗 ${shipperName} ➔ Về Quán`)
+            : `🚗 Đã chọn ${shipperName} làm điểm xuất phát!`;
+          showToast(toastMsg);
         });
 
         shipperMarkers.set(getShipperKey(shipper), marker);
