@@ -1424,6 +1424,13 @@
     // 20 giây/lần. Khi tab/app chạy nền sẽ tự dừng.
     const REFRESH_MS = 20000;
     const RESUME_RELOAD_MS = 1500;
+    const ROUTE_ESTIMATE_DISTANCE_FACTOR = 1.35;
+    const ROUTE_ESTIMATE_SPEED_M_PER_MIN = 500;
+    const ROUTE_STOP_SERVICE_MIN = 2.5;
+    const ROUTE_SCHEDULE_GRACE_MIN = 15;
+    const ROUTE_NORMAL_WAIT_TARGET_MIN = 28;
+    const ROUTE_NORMAL_WAIT_LIMIT_MIN = 35;
+    const ROUTE_OSRM_TABLE_URL = "https://router.project-osrm.org/table/v1/driving";
 
     // Thai Asia SushiBar, Leipziger Chaussee 147, Halle (Saale)
     const RESTAURANT = {
@@ -1536,11 +1543,14 @@
     let routeAnimationId = null;
     let movingArrowMarkers = [];
     let routeDrawRequestId = 0;
+    let routeAnalysisRenderId = 0;
+    let routeAnalysisCache = null;
 
     let openedOrderKey = null;
     let isRefreshingOrders = false;
     let lastOrders = [];
     let lastShippers = [];
+    const knownOrdersMap = new Map();
 
     const restaurantIcon = L.divIcon({
       className: "",
@@ -1850,11 +1860,30 @@
       });
     }
 
+    function filterAndRenderCurrentOrders() {
+      const selected = els.statusFilter.value;
+      const candidateList = Array.from(knownOrdersMap.values());
+      const source = candidateList.length > 0 ? candidateList : lastOrders;
+      if (source.length === 0) return;
+
+      let filtered;
+      if (selected === "all") {
+        filtered = source;
+      } else if (selected === "inprocess") {
+        filtered = source.filter(o => o.status === "new" || o.status === "inprocess");
+      } else {
+        filtered = source.filter(o => o.status === selected);
+      }
+      filtered = filtered.filter(order => order.shipping_method === "home_delivery");
+      renderOrders(filtered);
+    }
+
     els.statusFilter.addEventListener("change", () => {
       try {
         localStorage.setItem(STATUS_FILTER_KEY, els.statusFilter.value);
       } catch (err) {}
-      refreshAll();
+      filterAndRenderCurrentOrders();
+      refreshAll(true);
     });
 
     els.showOrders.addEventListener("change", () => {
@@ -2029,7 +2058,11 @@
 
       // Tránh trùng đơn nếu backend trả cùng đơn ở nhiều trạng thái.
       const unique = new Map();
-      orders.forEach(order => unique.set(order.id || order.code, order));
+      orders.forEach(order => {
+        const key = getOrderKey(order);
+        unique.set(key, order);
+        knownOrdersMap.set(key, order);
+      });
       orders = Array.from(unique.values());
 
       // Mặc định trên bản đồ luôn chỉ hiện đơn giao hàng
@@ -2524,8 +2557,8 @@
 
     function renderRoutePanelUi() {
       updateRouteBadge();
-
-      updateRouteSuggestionBanner();
+      const renderId = ++routeAnalysisRenderId;
+      updateRouteSuggestionBanner(renderId);
     }
 
     let toastTimer = null;
@@ -2597,10 +2630,223 @@
       return result;
     }
 
-    function evaluateRouteOrderPermutation(perm) {
+    function getRouteOrderLabel(key) {
+      const order = lastOrders.find(o => getOrderKey(o) === key);
+      return `#${order?.code ?? order?.id ?? key ?? "?"}`;
+    }
+
+    function getRoutePathLabel(perm) {
+      return (perm || []).map(getRouteOrderLabel).join(" → ");
+    }
+
+    function formatRouteMinutes(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return "0p";
+      if (Math.abs(n) < 1) return "<1p";
+      return `${Math.round(n)}p`;
+    }
+
+    function formatRouteKmFromMeters(value) {
+      const n = Number(value) || 0;
+      if (n < 1000) return `${Math.round(n)}m`;
+      return `${(n / 1000).toFixed(1)}km`;
+    }
+
+    function formatRouteClockFromNow(minutesFromNow) {
+      const d = new Date(Date.now() + (Number(minutesFromNow) || 0) * 60000);
+      return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function getRouteStartPoint() {
+      if (routeStartType && routeStartType.startsWith("shipper:")) {
+        const shipperKey = routeStartType.replace("shipper:", "");
+        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+        const lat = toNumber(shipper?.latitude ?? shipper?.lat);
+        const lng = toNumber(shipper?.longitude ?? shipper?.lng ?? shipper?.lon);
+        if (lat !== null && lng !== null) {
+          return {
+            id: "__start__",
+            label: shipper?.user?.name || shipper?.name || "Shipper",
+            lat,
+            lng
+          };
+        }
+      }
+
+      if (!routeStartType) return null;
+
+      return {
+        id: "__start__",
+        label: "Tại quán",
+        lat: RESTAURANT.lat,
+        lng: RESTAURANT.lng
+      };
+    }
+
+    function getOrderRoutePoint(key) {
+      const order = lastOrders.find(o => getOrderKey(o) === key);
+      if (!order) return null;
+      const lat = toNumber(order.latitude);
+      const lng = toNumber(order.longitude);
+      if (lat === null || lng === null) return null;
+      return {
+        id: key,
+        label: getRouteOrderLabel(key),
+        order,
+        lat,
+        lng
+      };
+    }
+
+    function buildRouteOptimizationPoints(keys) {
+      const startPoint = getRouteStartPoint();
+      const points = [];
+      const pointIndexById = new Map();
+      const skippedKeys = [];
+
+      if (startPoint) {
+        pointIndexById.set(startPoint.id, points.length);
+        points.push(startPoint);
+      }
+
+      (keys || []).forEach(key => {
+        const point = getOrderRoutePoint(key);
+        if (!point) {
+          skippedKeys.push(key);
+          return;
+        }
+        pointIndexById.set(key, points.length);
+        points.push(point);
+      });
+
+      let returnPointId = "__start__";
+      if (routeReturnToShop) {
+        const isStartAtRestaurant = startPoint
+          && Math.abs(startPoint.lat - RESTAURANT.lat) < 0.000001
+          && Math.abs(startPoint.lng - RESTAURANT.lng) < 0.000001;
+        if (!isStartAtRestaurant) {
+          returnPointId = "__return_shop__";
+          pointIndexById.set(returnPointId, points.length);
+          points.push({
+            id: returnPointId,
+            label: "Về Quán",
+            lat: RESTAURANT.lat,
+            lng: RESTAURANT.lng
+          });
+        }
+      }
+
+      return {
+        points,
+        pointIndexById,
+        startPoint,
+        startPointId: startPoint ? "__start__" : null,
+        returnPointId,
+        skippedKeys
+      };
+    }
+
+    function getRouteAnalysisCacheKey(keys) {
+      const startPoint = getRouteStartPoint();
+      const pointSig = (startPoint ? [startPoint] : [])
+        .concat((keys || []).map(getOrderRoutePoint).filter(Boolean))
+        .concat(routeReturnToShop ? [{ lat: RESTAURANT.lat, lng: RESTAURANT.lng }] : [])
+        .map(pt => `${Number(pt.lat).toFixed(6)},${Number(pt.lng).toFixed(6)}`)
+        .join("|");
+      return [
+        routeStartType || "restaurant-default",
+        routeReturnToShop ? "return" : "oneway",
+        (keys || []).join(","),
+        pointSig
+      ].join("::");
+    }
+
+    async function fetchOsrmRouteMatrix(keys) {
+      const cacheKey = getRouteAnalysisCacheKey(keys);
+      if (routeAnalysisCache?.key === cacheKey) {
+        const ageMs = Date.now() - (routeAnalysisCache.savedAt || 0);
+        const ttlMs = routeAnalysisCache.value?.mode === "osrm" ? 60000 : 10000;
+        if (ageMs < ttlMs) {
+          return routeAnalysisCache.value;
+        }
+      }
+
+      if (routeAnalysisCache?.key === cacheKey && routeAnalysisCache.pending) {
+        return routeAnalysisCache.pending;
+      }
+
+      const pending = (async () => {
+        const context = buildRouteOptimizationPoints(keys);
+        if (context.points.length < 2) {
+          const value = { ...context, mode: "estimate", durations: null, distances: null, error: "not-enough-points" };
+          routeAnalysisCache = { key: cacheKey, value, savedAt: Date.now(), pending: null };
+          return value;
+        }
+
+        const coords = context.points.map(pt => `${pt.lng},${pt.lat}`).join(";");
+        const url = `${ROUTE_OSRM_TABLE_URL}/${coords}?annotations=duration,distance`;
+
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (!data || data.code !== "Ok" || !Array.isArray(data.durations)) {
+            throw new Error(data?.message || "OSRM table failed");
+          }
+
+          const value = {
+            ...context,
+            mode: "osrm",
+            durations: data.durations,
+            distances: Array.isArray(data.distances) ? data.distances : null,
+            error: null
+          };
+          routeAnalysisCache = { key: cacheKey, value, savedAt: Date.now(), pending: null };
+          return value;
+        } catch (err) {
+          console.warn("Không lấy được OSRM Table, dùng ước lượng cũ:", err);
+          const value = {
+            ...context,
+            mode: "estimate",
+            durations: null,
+            distances: null,
+            error: err?.message || String(err)
+          };
+          routeAnalysisCache = { key: cacheKey, value, savedAt: Date.now(), pending: null };
+          return value;
+        }
+      })();
+
+      routeAnalysisCache = { key: cacheKey, value: null, savedAt: 0, pending };
+      return pending;
+    }
+
+    function getMatrixLeg(routeMatrix, fromPointId, toPointId) {
+      if (!routeMatrix || routeMatrix.mode !== "osrm") return null;
+      const fromIdx = routeMatrix.pointIndexById.get(fromPointId);
+      const toIdx = routeMatrix.pointIndexById.get(toPointId);
+      if (fromIdx === undefined || toIdx === undefined) return null;
+      const durationSec = routeMatrix.durations?.[fromIdx]?.[toIdx];
+      if (!Number.isFinite(durationSec)) return null;
+      const distanceMeters = routeMatrix.distances?.[fromIdx]?.[toIdx];
+      return {
+        travelMin: durationSec / 60,
+        distanceMeters: Number.isFinite(distanceMeters) ? distanceMeters : null,
+        mode: "osrm"
+      };
+    }
+
+    function analyzeRouteOrderPermutation(perm, routeMatrix = null) {
       let startLat = RESTAURANT.lat;
       let startLng = RESTAURANT.lng;
-      if (routeStartType && routeStartType.startsWith("shipper:")) {
+      let startLabel = "Chưa chọn điểm xuất phát";
+      let hasFixedStart = false;
+      if (routeMatrix?.startPoint) {
+        startLat = routeMatrix.startPoint.lat;
+        startLng = routeMatrix.startPoint.lng;
+        startLabel = routeMatrix.startPoint.label;
+        hasFixedStart = true;
+      } else if (routeStartType && routeStartType.startsWith("shipper:")) {
         const shipperKey = routeStartType.replace("shipper:", "");
         const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
         const sLat = toNumber(shipper?.latitude ?? shipper?.lat);
@@ -2608,46 +2854,90 @@
         if (sLat !== null && sLng !== null) {
           startLat = sLat;
           startLng = sLng;
+          startLabel = shipper?.user?.name || shipper?.name || "Shipper";
+          hasFixedStart = true;
         }
+      } else if (routeStartType === "restaurant") {
+        startLabel = "Tại quán";
+        hasFixedStart = true;
       }
 
-      let currentLat = startLat;
-      let currentLng = startLng;
-
-      // Bước 1: Tính toán thời gian di chuyển từng chặng
+      let currentLat = hasFixedStart ? startLat : null;
+      let currentLng = hasFixedStart ? startLng : null;
+      let currentLabel = startLabel;
+      let currentPointId = hasFixedStart ? "__start__" : null;
       let totalTravelMin = 0;
+      let estimatedDistanceMeters = 0;
+      let fallbackLegCount = 0;
       const orderMetaList = [];
+      const skippedKeys = [];
 
       for (let i = 0; i < perm.length; i++) {
         const key = perm[i];
         const order = lastOrders.find(o => getOrderKey(o) === key);
-        if (!order) continue;
+        if (!order) {
+          skippedKeys.push(key);
+          continue;
+        }
 
         const oLat = toNumber(order.latitude);
         const oLng = toNumber(order.longitude);
-        if (oLat === null || oLng === null) continue;
+        if (oLat === null || oLng === null) {
+          skippedKeys.push(key);
+          continue;
+        }
 
-        const straightDistMeters = calculateDistanceMeters(currentLat, currentLng, oLat, oLng);
-        const legTravelMin = (straightDistMeters * 1.35) / 500;
+        const isFirstWithoutStart = currentPointId === null;
+        const straightDistMeters = isFirstWithoutStart ? 0 : calculateDistanceMeters(currentLat, currentLng, oLat, oLng);
+        let estimatedLegMeters = straightDistMeters * ROUTE_ESTIMATE_DISTANCE_FACTOR;
+        let legTravelMin = estimatedLegMeters / ROUTE_ESTIMATE_SPEED_M_PER_MIN;
+        let legMode = isFirstWithoutStart ? "start" : "estimate";
+        const matrixLeg = currentPointId === null ? null : getMatrixLeg(routeMatrix, currentPointId, key);
+        if (matrixLeg) {
+          legTravelMin = matrixLeg.travelMin;
+          if (matrixLeg.distanceMeters !== null) estimatedLegMeters = matrixLeg.distanceMeters;
+          legMode = "osrm";
+        } else if (routeMatrix?.mode === "osrm") {
+          fallbackLegCount++;
+        }
         totalTravelMin += legTravelMin;
+        estimatedDistanceMeters += estimatedLegMeters;
 
-        const tripTime = totalTravelMin + i * 2.5;
-
+        const tripTime = totalTravelMin + i * ROUTE_STOP_SERVICE_MIN;
         const schedule = parseOrderSchedule(order);
         const waitMin = getOrderWaitTimeMinutes(order);
+        const label = getRouteOrderLabel(key);
+        const displayTime = getDisplayOrderTime(order);
+        const rawTime = String(order.time || "").trim();
+        const timingLabel = schedule.isScheduled
+          ? `${label}: giờ hẹn ${displayTime || formatRouteClockFromNow(schedule.targetMinutesFromNow)}`
+          : (displayTime
+            ? `${label}: app coi là đơn thường; ${displayTime} là giờ hiển thị, không phải giờ hẹn`
+            : `${label}: app coi là đơn thường`);
 
         orderMetaList.push({
+          key,
           order,
+          label,
+          displayTime,
+          rawTime,
+          timingLabel,
           schedule,
           waitMin,
-          tripTime
+          tripTime,
+          legTravelMin,
+          straightDistMeters,
+          estimatedLegMeters,
+          legMode,
+          fromLabel: currentLabel
         });
 
         currentLat = oLat;
         currentLng = oLng;
+        currentLabel = label;
+        currentPointId = key;
       }
 
-      // Bước 2: Backward Scheduling - Tự động tính độ lùi thời gian xuất phát lý tưởng
       let maxAllowedD = Infinity;
       let idealD = Infinity;
       let hasScheduled = false;
@@ -2662,8 +2952,7 @@
             idealD = neededD;
           }
         } else {
-          // Đơn thường: khống chế không để khách chờ quá 35 phút
-          const limitD = Math.max(0, 35 - item.waitMin - item.tripTime);
+          const limitD = Math.max(0, ROUTE_NORMAL_WAIT_LIMIT_MIN - item.waitMin - item.tripTime);
           if (limitD < maxAllowedD) {
             maxAllowedD = limitD;
           }
@@ -2676,70 +2965,170 @@
         if (!Number.isFinite(departureOffset)) departureOffset = 0;
       }
 
-      // Bước 3: Chấm điểm phạt độ trễ và độ sớm từ mốc xuất phát lý tưởng
       let totalPenalty = 0;
+      let schedulePenalty = 0;
+      let normalWaitPenalty = 0;
+      let sequencePenalty = 0;
       const scheduledStops = [];
+      const stopDetails = [];
+      const reasons = [];
 
       for (let i = 0; i < orderMetaList.length; i++) {
         const item = orderMetaList[i];
         const arrivalFromNow = departureOffset + item.tripTime;
+        const detail = {
+          key: item.key,
+          label: item.label,
+          fromLabel: item.fromLabel,
+          travelMin: item.legTravelMin,
+          mode: item.legMode,
+          arrivalFromNow,
+          arrivalClock: formatRouteClockFromNow(arrivalFromNow),
+          waitMin: item.waitMin,
+          isScheduled: item.schedule.isScheduled,
+          timingLabel: item.timingLabel,
+          notes: []
+        };
 
         if (item.schedule.isScheduled) {
           const targetMin = item.schedule.targetMinutesFromNow;
+          detail.targetClock = formatRouteClockFromNow(targetMin);
           if (arrivalFromNow < targetMin) {
-            totalPenalty += (targetMin - arrivalFromNow) * 0.2;
-          } else if (arrivalFromNow <= targetMin + 15) {
-            totalPenalty += 0;
+            const earlyMin = targetMin - arrivalFromNow;
+            const penalty = earlyMin * 0.2;
+            totalPenalty += penalty;
+            schedulePenalty += penalty;
+            detail.notes.push(`đến sớm ${formatRouteMinutes(earlyMin)} so với giờ hẹn`);
+          } else if (arrivalFromNow <= targetMin + ROUTE_SCHEDULE_GRACE_MIN) {
+            detail.notes.push(`đến trong ngưỡng hẹn ${detail.targetClock}`);
           } else {
-            const lateMin = arrivalFromNow - (targetMin + 15);
-            totalPenalty += Math.pow(lateMin, 2) * 5;
+            const lateMin = arrivalFromNow - (targetMin + ROUTE_SCHEDULE_GRACE_MIN);
+            const penalty = Math.pow(lateMin, 2) * 5;
+            totalPenalty += penalty;
+            schedulePenalty += penalty;
+            detail.notes.push(`trễ ${formatRouteMinutes(lateMin)} sau ngưỡng +${ROUTE_SCHEDULE_GRACE_MIN}p`);
           }
-          scheduledStops.push({ index: i, targetMin });
+          scheduledStops.push({ index: i, targetMin, label: item.label });
         } else {
           const totalWaitAtDelivery = item.waitMin + arrivalFromNow;
-          if (totalWaitAtDelivery > 28) {
-            totalPenalty += Math.pow(totalWaitAtDelivery - 28, 1.6) * 1.6;
+          detail.totalWaitAtDelivery = totalWaitAtDelivery;
+          if (totalWaitAtDelivery > ROUTE_NORMAL_WAIT_TARGET_MIN) {
+            const overMin = totalWaitAtDelivery - ROUTE_NORMAL_WAIT_TARGET_MIN;
+            const penalty = Math.pow(overMin, 1.6) * 1.6;
+            totalPenalty += penalty;
+            normalWaitPenalty += penalty;
+            detail.notes.push(`đơn thường chờ khoảng ${formatRouteMinutes(totalWaitAtDelivery)}`);
+          } else {
+            detail.notes.push(`đơn thường chưa vượt ngưỡng chờ ${ROUTE_NORMAL_WAIT_TARGET_MIN}p`);
           }
         }
+        stopDetails.push(detail);
       }
 
-      // Phạt nặng nghịch đảo thứ tự giờ hẹn (Đơn hẹn sớm hơn bắt buộc phải đi trước)
       for (let j = 0; j < scheduledStops.length; j++) {
         for (let k = j + 1; k < scheduledStops.length; k++) {
           const earlierStop = scheduledStops[j];
           const laterStop = scheduledStops[k];
           if (earlierStop.targetMin > laterStop.targetMin + 5) {
             const diff = earlierStop.targetMin - laterStop.targetMin;
-            totalPenalty += diff * 20;
+            const penalty = diff * 20;
+            totalPenalty += penalty;
+            sequencePenalty += penalty;
+            reasons.push(`${laterStop.label} hẹn sớm hơn ${earlierStop.label} khoảng ${formatRouteMinutes(diff)} nhưng lại bị xếp sau`);
           }
         }
       }
 
+      let returnTravelMin = 0;
       if (routeReturnToShop) {
         const distBack = calculateDistanceMeters(currentLat, currentLng, RESTAURANT.lat, RESTAURANT.lng);
-        totalTravelMin += (distBack * 1.35) / 500;
-      }
-
-      return (totalTravelMin * 1.25) + totalPenalty;
-    }
-
-    function getOptimalRoutePermutation(keys) {
-      if (!Array.isArray(keys) || keys.length < 2) return keys ? [...keys] : [];
-      const perms = getPermutations(keys);
-      let bestPerm = keys;
-      let minCost = Infinity;
-
-      for (let i = 0; i < perms.length; i++) {
-        const cost = evaluateRouteOrderPermutation(perms[i]);
-        if (cost < minCost) {
-          minCost = cost;
-          bestPerm = perms[i];
+        let estimatedBackMeters = distBack * ROUTE_ESTIMATE_DISTANCE_FACTOR;
+        returnTravelMin = estimatedBackMeters / ROUTE_ESTIMATE_SPEED_M_PER_MIN;
+        const returnLeg = getMatrixLeg(routeMatrix, currentPointId, routeMatrix?.returnPointId || "__start__");
+        if (returnLeg) {
+          returnTravelMin = returnLeg.travelMin;
+          if (returnLeg.distanceMeters !== null) estimatedBackMeters = returnLeg.distanceMeters;
+        } else if (routeMatrix?.mode === "osrm") {
+          fallbackLegCount++;
         }
+        totalTravelMin += returnTravelMin;
+        estimatedDistanceMeters += estimatedBackMeters;
       }
-      return bestPerm;
+
+      if (hasScheduled && departureOffset > 0) {
+        reasons.unshift(`có thể xuất phát sau ${formatRouteMinutes(departureOffset)} để bớt tới đơn hẹn quá sớm`);
+      } else {
+        reasons.unshift("đề xuất đi ngay theo thời gian hiện tại");
+      }
+
+      if (!hasFixedStart) {
+        reasons.unshift("chưa chọn Quán/Shipper làm điểm xuất phát nên app chỉ so đoạn giữa các đơn");
+      }
+
+      if (sequencePenalty === 0 && scheduledStops.length >= 2) {
+        reasons.push("thứ tự đơn hẹn không bị đảo quá 5p");
+      }
+
+      const travelScore = totalTravelMin * 1.25;
+      const cost = travelScore + totalPenalty;
+
+      return {
+        perm: [...perm],
+        pathLabel: getRoutePathLabel(perm),
+        startLabel,
+        cost,
+        travelScore,
+        totalPenalty,
+        schedulePenalty,
+        normalWaitPenalty,
+        sequencePenalty,
+        totalTravelMin,
+        departureOffset,
+        estimatedDistanceMeters,
+        returnTravelMin,
+        routingMode: routeMatrix?.mode === "osrm" ? "osrm" : "estimate",
+        matrixError: routeMatrix?.error || null,
+        fallbackLegCount,
+        hasFixedStart,
+        hasScheduled,
+        scheduledStops,
+        stopDetails,
+        skippedKeys,
+        reasons
+      };
     }
 
-    function updateRouteSuggestionBanner() {
+    function evaluateRouteOrderPermutation(perm) {
+      return analyzeRouteOrderPermutation(perm).cost;
+    }
+
+    async function getRouteOptimizationAnalysis(keys) {
+      if (!Array.isArray(keys) || keys.length < 2) return null;
+      const routeMatrix = await fetchOsrmRouteMatrix(keys);
+      const analyses = getPermutations(keys)
+        .map(perm => analyzeRouteOrderPermutation(perm, routeMatrix))
+        .sort((a, b) => a.cost - b.cost);
+      const currentPath = keys.join("|");
+      const currentRank = analyses.findIndex(item => item.perm.join("|") === currentPath);
+      const current = currentRank >= 0 ? analyses[currentRank] : analyzeRouteOrderPermutation(keys, routeMatrix);
+      return {
+        permutationsCount: analyses.length,
+        best: analyses[0] || current,
+        current,
+        currentRank: currentRank >= 0 ? currentRank + 1 : null,
+        alternatives: analyses.slice(0, 5),
+        all: analyses,
+        routeMatrix
+      };
+    }
+
+    async function getOptimalRoutePermutation(keys) {
+      if (!Array.isArray(keys) || keys.length < 2) return keys ? [...keys] : [];
+      const analysis = await getRouteOptimizationAnalysis(keys);
+      return analysis?.best?.perm ? [...analysis.best.perm] : [...keys];
+    }
+
+    async function updateRouteSuggestionBanner(renderId = routeAnalysisRenderId) {
       if (!els.routeSuggestionBanner || !els.suggestionLabel || !els.suggestionPath) return;
 
       if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) {
@@ -2747,13 +3136,21 @@
         return;
       }
 
-      const bestPerm = getOptimalRoutePermutation(routeOrderKeys);
+      const keysSnapshot = [...routeOrderKeys];
+      els.suggestionLabel.textContent = "Đang tính đường xe:";
+      els.suggestionPath.textContent = "...";
+      els.routeSuggestionBanner.classList.remove("optimal");
+      if (els.suggestionApplyBtn) els.suggestionApplyBtn.style.display = "none";
+      els.routeSuggestionBanner.classList.remove("hidden");
+
+      const bestPerm = await getOptimalRoutePermutation(keysSnapshot);
+      if (renderId !== routeAnalysisRenderId || !isSameRoutePath(keysSnapshot, routeOrderKeys)) return;
       if (!bestPerm || bestPerm.length < 2) {
         els.routeSuggestionBanner.classList.add("hidden");
         return;
       }
 
-      const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
+      const isSame = isSameRoutePath(routeOrderKeys, bestPerm);
 
       const pathHtml = bestPerm.map(k => {
         const order = lastOrders.find(o => getOrderKey(o) === k);
@@ -2776,13 +3173,176 @@
       els.routeSuggestionBanner.classList.remove("hidden");
     }
 
-    window.applySuggestedRouteOrder = function () {
+    function isSameRoutePath(a, b) {
+      return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((key, i) => key === b[i]);
+    }
+
+    function buildRouteOptimizationSummaryText(analysis, reason = "manual") {
+      if (!analysis || !analysis.best) return "";
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      const best = analysis.best;
+      const current = analysis.current;
+      const isCurrentBest = current && isSameRoutePath(best.perm, current.perm);
+      const algoType = analysis.routeMatrix?.mode === "osrm"
+        ? "OSRM Table Driving Matrix (Thời gian/khoảng cách xe chạy thực tế OSRM)"
+        : `Fallback (Ước lượng đường thẳng x${ROUTE_ESTIMATE_DISTANCE_FACTOR}, tốc độ ${ROUTE_ESTIMATE_SPEED_M_PER_MIN}m/p)`;
+
+      const lines = [];
+      lines.push("================================================================================");
+      lines.push("           THÔNG TIN TỐI ƯU & SUY LUẬN LỘ TRÌNH (THAI ASIA MAP)                 ");
+      lines.push("================================================================================");
+      lines.push(`🕒 Thời điểm phân tích : ${timeStr}`);
+      lines.push(`🎯 Thao tác trigger    : ${reason}`);
+      lines.push(`⚙️ Thuật toán định tuyến: ${algoType}`);
+      lines.push(`🔢 Số phương án đã thử : ${analysis.permutationsCount} hoán vị`);
+      lines.push(`📍 Điểm xuất phát      : ${best.startLabel}`);
+      lines.push(`🔄 Vòng về quán        : ${routeReturnToShop ? "CÓ" : "KHÔNG"}`);
+      lines.push(`⏱️ Dừng giao mỗi đơn  : ${ROUTE_STOP_SERVICE_MIN} phút/điểm`);
+      lines.push("--------------------------------------------------------------------------------");
+      lines.push("");
+      lines.push("🏆 [1] PHƯƠNG ÁN TỐI ƯU NHẤT (Rank 1):");
+      lines.push(`  • Lộ trình       : ${best.pathLabel}`);
+      lines.push(`  • Điểm phạt/Cost : ${best.cost.toFixed(2)} điểm (Càng thấp càng tối ưu)`);
+      lines.push(`  • Thời gian chạy : ~${formatRouteMinutes(best.totalTravelMin)} (~${formatRouteKmFromMeters(best.estimatedDistanceMeters)})`);
+      lines.push(`  • Giờ xuất phát  : ${best.departureOffset > 0 ? `Sau ${formatRouteMinutes(best.departureOffset)} (để tránh tới đơn hẹn quá sớm)` : "Đi ngay bây giờ"}`);
+      lines.push(`  • Tổng điểm phạt : ${best.totalPenalty.toFixed(2)} điểm (Phạt hẹn: ${best.schedulePenalty.toFixed(1)}, Phạt khách chờ: ${best.normalWaitPenalty.toFixed(1)}, Đảo giờ: ${best.sequencePenalty.toFixed(1)})`);
+      lines.push("  • Chi tiết từng chặng:");
+      best.stopDetails.forEach((stop, idx) => {
+        const target = stop.isScheduled ? ` [HẸN ${stop.targetClock}]` : "";
+        const note = stop.notes.length ? ` (${stop.notes.join("; ")})` : "";
+        const mode = stop.mode === "osrm" ? "OSRM" : stop.mode === "start" ? "Bắt đầu" : "Ước lượng";
+        lines.push(`    ${idx + 1}. ${stop.fromLabel} ➔ ${stop.label}: ~${formatRouteMinutes(stop.travelMin)} [${mode}], đến ${stop.arrivalClock}${target}${note}`);
+      });
+      if (routeReturnToShop && best.returnTravelMin > 0) {
+        lines.push(`    ↳ Điểm cuối ➔ Quán: ~${formatRouteMinutes(best.returnTravelMin)}`);
+      }
+      lines.push("  • Lý do thuật toán chọn phương án này:");
+      best.reasons.forEach(r => lines.push(`    - ${r}`));
+      lines.push("");
+
+      if (!isCurrentBest && current) {
+        lines.push("📌 [2] SO SÁNH VỚI PHƯƠNG ÁN HIỆN TẠI (Đang chọn trên bản đồ):");
+        lines.push(`  • Lộ trình hiện tại : ${current.pathLabel}`);
+        lines.push(`  • Thứ hạng hiện tại : Hạng ${analysis.currentRank || "?"}/${analysis.permutationsCount}`);
+        lines.push(`  • Điểm phạt/Cost    : ${current.cost.toFixed(2)} (Kém hơn phương án tối ưu: +${(current.cost - best.cost).toFixed(2)} điểm)`);
+        lines.push(`  • Thời gian chạy xe : ~${formatRouteMinutes(current.totalTravelMin)} (~${formatRouteKmFromMeters(current.estimatedDistanceMeters)}) [Chênh lệch: ${current.totalTravelMin >= best.totalTravelMin ? `+${(current.totalTravelMin - best.totalTravelMin).toFixed(1)}p` : `-${(best.totalTravelMin - current.totalTravelMin).toFixed(1)}p`}]`);
+        lines.push(`  • Chi tiết phạt     : Phạt hẹn: ${current.schedulePenalty.toFixed(1)}, Phạt khách chờ: ${current.normalWaitPenalty.toFixed(1)}, Đảo giờ: ${current.sequencePenalty.toFixed(1)}`);
+        lines.push("  • Chi tiết từng chặng hiện tại:");
+        current.stopDetails.forEach((stop, idx) => {
+          const target = stop.isScheduled ? ` [HẸN ${stop.targetClock}]` : "";
+          const note = stop.notes.length ? ` (${stop.notes.join("; ")})` : "";
+          lines.push(`    ${idx + 1}. ${stop.fromLabel} ➔ ${stop.label}: ~${formatRouteMinutes(stop.travelMin)}, đến ${stop.arrivalClock}${target}${note}`);
+        });
+        lines.push("");
+      } else {
+        lines.push("📌 [2] TRẠNG THÁI HIỆN TẠI: Lộ trình đang chọn trên bản đồ chính là phương án tối ưu nhất! 👍");
+        lines.push("");
+      }
+
+      lines.push("📊 [3] TOP CÁC PHƯƠNG ÁN TỐT NHẤT:");
+      analysis.alternatives.forEach((alt, idx) => {
+        lines.push(`  #${idx + 1}. ${alt.pathLabel} | Cost: ${alt.cost.toFixed(2)} | Chạy: ${formatRouteMinutes(alt.totalTravelMin)} | Phạt: ${alt.totalPenalty.toFixed(1)}`);
+      });
+      lines.push("================================================================================");
+      lines.push("👉 GỢI Ý: Copy toàn bộ khối văn bản trên gửi lại nếu cần AI phân tích suy luận.");
+      lines.push("================================================================================");
+      return lines.join("\n");
+    }
+
+    async function logRouteOptimizationDebug(reason = "manual") {
+      const keysSnapshot = [...routeOrderKeys];
+      const analysis = await getRouteOptimizationAnalysis(keysSnapshot);
+      if (!analysis || !analysis.best) return;
+
+      const summaryText = buildRouteOptimizationSummaryText(analysis, reason);
+
+      const overviewRows = analysis.all.slice(0, 50).map((item, idx) => ({
+        "Hạng": idx + 1,
+        "Thứ tự giao": item.pathLabel,
+        "Tổng điểm": Number(item.cost.toFixed(2)),
+        "Thời gian chạy (p)": Number(item.totalTravelMin.toFixed(1)),
+        "Khoảng cách (m)": Math.round(item.estimatedDistanceMeters),
+        "Xuất phát sau (p)": Number(item.departureOffset.toFixed(1)),
+        "Tổng phạt": Number(item.totalPenalty.toFixed(2)),
+        "Phạt hẹn": Number(item.schedulePenalty.toFixed(2)),
+        "Phạt khách chờ": Number(item.normalWaitPenalty.toFixed(2)),
+        "Phạt đảo giờ": Number(item.sequencePenalty.toFixed(2)),
+        "Chế độ": item.routingMode
+      }));
+
+      const bestLegRows = analysis.best.stopDetails.map((stop, idx) => ({
+        "Chặng": `${idx + 1}`,
+        "Từ": stop.fromLabel,
+        "Đến": stop.label,
+        "Thời gian chạy (p)": Number(stop.travelMin.toFixed(1)),
+        "Dự kiến đến": stop.arrivalClock,
+        "Giờ hẹn": stop.isScheduled ? stop.targetClock : "—",
+        "Khách chờ (p)": stop.waitMin ? Number(stop.waitMin.toFixed(1)) : "—",
+        "Hình thức": stop.mode,
+        "Ghi chú / Phạt": stop.notes.join(" | ") || "Chuẩn"
+      }));
+
+      console.groupCollapsed(`🚚 [LỘ TRÌNH TỐI ƯU] ${reason} - (${analysis.best.pathLabel}) | Click mở rộng để xem hoặc copy text`);
+      console.log(summaryText);
+      console.info("📋 BẢNG TỔNG QUAN XẾP HẠNG (Top phương án):");
+      console.table(overviewRows);
+      console.info("📍 CHI TIẾT TỪNG CHẶNG CỦA PHƯƠNG ÁN TỐI ƯU (Rank 1):");
+      console.table(bestLegRows);
+      if (analysis.current && !isSameRoutePath(analysis.best.perm, analysis.current.perm)) {
+        const currentLegRows = analysis.current.stopDetails.map((stop, idx) => ({
+          "Chặng": `${idx + 1}`,
+          "Từ": stop.fromLabel,
+          "Đến": stop.label,
+          "Thời gian chạy (p)": Number(stop.travelMin.toFixed(1)),
+          "Dự kiến đến": stop.arrivalClock,
+          "Giờ hẹn": stop.isScheduled ? stop.targetClock : "—",
+          "Hình thức": stop.mode,
+          "Ghi chú / Phạt": stop.notes.join(" | ") || "Chuẩn"
+        }));
+        console.info("⚠️ CHI TIẾT TỪNG CHẶNG CỦA PHƯƠNG ÁN ĐANG CHỌN TRÊN BẢN ĐỒ:");
+        console.table(currentLegRows);
+      }
+      console.log("🔍 Object dữ liệu phân tích đầy đủ (Raw Data):", analysis);
+      console.groupEnd();
+    }
+
+    window.buildRouteOptimizationSummaryText = buildRouteOptimizationSummaryText;
+    window.logRouteOptimizationDebug = logRouteOptimizationDebug;
+
+    window.copyRouteOptimizationSummary = async function () {
+      if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) {
+        showToast("Cần ít nhất 2 đơn trong lộ trình để phân tích!");
+        return;
+      }
+      showToast("Đang tạo tóm tắt phân tích...");
+      const analysis = await getRouteOptimizationAnalysis([...routeOrderKeys]);
+      if (!analysis || !analysis.best) {
+        showToast("Không thể phân tích lộ trình!");
+        return;
+      }
+      const summaryText = buildRouteOptimizationSummaryText(analysis, "manual copy");
+      try {
+        await navigator.clipboard.writeText(summaryText);
+        showToast("📋 Đã copy tóm tắt suy luận vào clipboard!");
+      } catch (err) {
+        console.log(summaryText);
+        showToast("Đã in tóm tắt ra Console F12!");
+      }
+    };
+
+    window.applySuggestedRouteOrder = async function () {
       if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
-      const bestPerm = getOptimalRoutePermutation(routeOrderKeys);
-      const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
-      routeOrderKeys = bestPerm;
+      const keysSnapshot = [...routeOrderKeys];
+      showToast("Đang tính đường xe OSRM...", 1800);
       routeStartType = "restaurant";
       routeReturnToShop = true;
+      routeAnalysisCache = null;
+      await logRouteOptimizationDebug("apply suggested route");
+      const bestPerm = await getOptimalRoutePermutation(keysSnapshot);
+      if (!isSameRoutePath(keysSnapshot, routeOrderKeys)) return;
+      const isSame = isSameRoutePath(routeOrderKeys, bestPerm);
+      routeOrderKeys = bestPerm;
       isRoutingArmed = true;
       lastInteractedOrderKey = null;
       updateRouteReadyOrderMarkerUi();
@@ -2796,11 +3356,15 @@
       showToast("✨ Đã áp dụng gợi ý và nối Quán đầu/cuối!");
     };
 
-    window.optimizeRouteOrders = function () {
+    window.optimizeRouteOrders = async function () {
       if (!Array.isArray(routeOrderKeys) || routeOrderKeys.length < 2) return;
 
-      const bestPerm = getOptimalRoutePermutation(routeOrderKeys);
-      const isSame = routeOrderKeys.every((k, i) => k === bestPerm[i]);
+      const keysSnapshot = [...routeOrderKeys];
+      showToast("Đang tính đường xe OSRM...", 1800);
+      await logRouteOptimizationDebug("optimize button");
+      const bestPerm = await getOptimalRoutePermutation(keysSnapshot);
+      if (!isSameRoutePath(keysSnapshot, routeOrderKeys)) return;
+      const isSame = isSameRoutePath(routeOrderKeys, bestPerm);
       if (isSame) {
         showToast("Lộ trình hiện tại đã tối ưu nhất! 👍");
       } else {
@@ -3760,9 +4324,16 @@
 
 
     let lastRefreshCompletedAt = 0;
+    let refreshPending = false;
 
     async function refreshAll(force = false) {
-      if (refreshing || !appUnlocked) return;
+      if (!appUnlocked) return;
+      if (refreshing) {
+        if (force) {
+          refreshPending = true;
+        }
+        return;
+      }
       const now = Date.now();
       // Nếu không bắt buộc và vừa refresh cách đây dưới 3.5s, bỏ qua để tránh trùng request
       if (!force && (now - lastRefreshCompletedAt < 3500)) return;
@@ -3794,6 +4365,10 @@
         refreshing = false;
         els.reloadButton.classList.remove("loading");
         els.reloadButton.disabled = false;
+        if (refreshPending) {
+          refreshPending = false;
+          refreshAll(true);
+        }
       }
     }
 
