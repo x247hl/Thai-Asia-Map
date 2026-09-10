@@ -1401,17 +1401,15 @@
       <input id="showTraffic" type="checkbox" checked />
     </label>
 
-    <div class="field-label" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-      <span>Google Routes API Key</span>
-      <span id="googleApiKeyBadge" style="font-size: 10px; font-weight: 700; color: #64748b;">(OSRM)</span>
-    </div>
-    <div style="display: flex; gap: 4px; align-items: center;">
-      <input id="googleApiKeyInput" type="password" placeholder="Dán khóa AIzaSy... tại đây"
-        style="flex: 1; height: 30px; font-size: 11px; padding: 0 8px; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; background: #fff;" />
-      <button id="saveGoogleApiKeyBtn" type="button"
-        style="height: 30px; padding: 0 10px; font-size: 11px; font-weight: 700; background: #7c3aed; color: #fff; border: 0; border-radius: 6px; cursor: pointer; white-space: nowrap;">Lưu</button>
-    </div>
-    <div id="googleApiKeyStatus" style="font-size: 10.5px; margin-top: 3px; color: #64748b;">Chưa nhập key (tự động dùng OSRM miễn phí)</div>
+    <label class="toggle-row">
+      <span>Định tuyến Live Traffic</span>
+      <input id="enableLiveRouting" type="checkbox" checked />
+    </label>
+
+    <label class="toggle-row">
+      <span>Hiện chi tiết đơn</span>
+      <input id="showOrderDetails" type="checkbox" checked />
+    </label>
 
     <div class="setting-shipper-list">
       <div class="shipper-list-title">Tất cả shipper</div>
@@ -1427,7 +1425,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v65</span>
+      <span style="font-weight: 700; color: #7c3aed;">v72</span>
     </div>
   </div>
 
@@ -1584,31 +1582,30 @@
       icon: restaurantIcon,
       zIndexOffset: 0
     })
-      .bindPopup("<b>Thai Asia SushiBar</b><br>Leipziger Chaussee 147")
+      .bindPopup("<b>Thai Asia SushiBar</b>")
       .addTo(map);
 
     restaurantMarker.on("click", () => {
+      if (lastInteractedOrderKey && !routeOrderKeys.includes(lastInteractedOrderKey)) {
+        routeOrderKeys.push(lastInteractedOrderKey);
+      }
+      lastInteractedOrderKey = null;
+
       // 1. Nếu đã chọn Shipper làm điểm xuất phát:
       if (routeStartType && routeStartType.startsWith("shipper:")) {
         routeReturnToShop = !routeReturnToShop;
-        const shipperKey = routeStartType.replace("shipper:", "");
-        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
-        const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
-        showToast(routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ Đơn ➔ Về Quán!` : "Đã bỏ chặng về Quán");
       } else if (routeStartType === "restaurant" && routeOrderKeys.length > 0) {
         // Nếu điểm xuất phát đã là Quán và đã có đơn: toggle vòng về Quán
         routeReturnToShop = !routeReturnToShop;
-        showToast(routeReturnToShop ? "🏪 Đã nối vòng về Quán ở cuối lộ trình!" : "Đã bỏ chặng về Quán");
       } else {
         // Nếu chưa chọn điểm xuất phát hoặc chưa có đơn: đặt Quán làm điểm xuất phát
         routeStartType = "restaurant";
         routeReturnToShop = false;
-        showToast("🏪 Đã chọn Quán làm điểm xuất phát!");
       }
 
       isRoutingArmed = true;
-      lastInteractedOrderKey = null;
       updateRouteReadyOrderMarkerUi();
+      updateRouteToggleButtonsUi();
       renderRoutePanelUi();
       calculateAndDrawRoute();
       toggleRoutePanel(true);
@@ -1653,60 +1650,35 @@
       showOrders: document.getElementById("showOrders"),
       showShippers: document.getElementById("showShippers"),
       showTraffic: document.getElementById("showTraffic"),
+      enableLiveRouting: document.getElementById("enableLiveRouting"),
+      showOrderDetails: document.getElementById("showOrderDetails"),
       reloadButton: document.getElementById("reloadButton"),
       orderSummary: document.getElementById("orderSummary"),
       orderCount: document.getElementById("orderCount"),
       currentZoom: document.getElementById("currentZoom"),
       shipperStatusList: document.getElementById("shipperStatusList"),
       shipperSettingList: document.getElementById("shipperSettingList"),
-      googleApiKeyInput: document.getElementById("googleApiKeyInput"),
-      saveGoogleApiKeyBtn: document.getElementById("saveGoogleApiKeyBtn"),
-      googleApiKeyStatus: document.getElementById("googleApiKeyStatus"),
-      googleApiKeyBadge: document.getElementById("googleApiKeyBadge"),
       lastUpdate: document.getElementById("lastUpdate")
     };
 
     const DEFAULT_GOOGLE_ROUTES_API_KEY = "AIzaSyBCB0wI2tOTlRVbj_bSQ43cWzHfAlgPBy0";
-    const GOOGLE_ROUTES_KEY_STORAGE = "thaiasia.googleRoutesApiKey";
-    let googleRoutesApiKey = localStorage.getItem(GOOGLE_ROUTES_KEY_STORAGE) || DEFAULT_GOOGLE_ROUTES_API_KEY;
+    let googleRoutesApiKey = DEFAULT_GOOGLE_ROUTES_API_KEY;
+    const ENABLE_LIVE_ROUTING_KEY = "thaiasia.enableLiveRouting";
+    const SHOW_ORDER_DETAILS_KEY = "thaiasia.showOrderDetails";
 
-    function updateGoogleApiKeyUi() {
-      if (!els.googleApiKeyInput) return;
-      els.googleApiKeyInput.value = googleRoutesApiKey || "";
-      const hasKey = Boolean(googleRoutesApiKey && googleRoutesApiKey.trim().length > 10);
-      if (els.googleApiKeyBadge) {
-        els.googleApiKeyBadge.textContent = hasKey ? "🟢 Live Traffic" : "(OSRM)";
-        els.googleApiKeyBadge.style.color = hasKey ? "#16a34a" : "#64748b";
+    if (els.enableLiveRouting) {
+      if (localStorage.getItem(ENABLE_LIVE_ROUTING_KEY) !== null) {
+        els.enableLiveRouting.checked = localStorage.getItem(ENABLE_LIVE_ROUTING_KEY) !== "0";
+      } else {
+        els.enableLiveRouting.checked = true;
       }
-      if (els.googleApiKeyStatus) {
-        if (hasKey) {
-          const keyTrim = googleRoutesApiKey.trim();
-          const isCustom = Boolean(localStorage.getItem(GOOGLE_ROUTES_KEY_STORAGE));
-          const masked = keyTrim.length > 10 ? (keyTrim.slice(0, 6) + "..." + keyTrim.slice(-4)) : keyTrim;
-          els.googleApiKeyStatus.innerHTML = `<span style="color:#16a34a; font-weight:700;">Đã bật Live Traffic (${escapeHtml(masked)})${isCustom ? " [Tùy chỉnh]" : " [Mặc định]"}</span>`;
-        } else {
-          els.googleApiKeyStatus.innerHTML = `<span style="color:#64748b;">Chưa nhập key (tự động dùng OSRM miễn phí)</span>`;
-        }
-      }
-    }
 
-    if (els.saveGoogleApiKeyBtn && els.googleApiKeyInput) {
-      els.saveGoogleApiKeyBtn.addEventListener("click", () => {
-        const val = (els.googleApiKeyInput.value || "").trim();
-        if (val) {
-          googleRoutesApiKey = val;
-          try {
-            localStorage.setItem(GOOGLE_ROUTES_KEY_STORAGE, val);
-          } catch (e) {}
-          showToast("🔑 Đã lưu Google Routes API Key tùy chỉnh!");
-        } else {
-          try {
-            localStorage.removeItem(GOOGLE_ROUTES_KEY_STORAGE);
-          } catch (e) {}
-          googleRoutesApiKey = DEFAULT_GOOGLE_ROUTES_API_KEY;
-          showToast("Đã khôi phục khóa mặc định");
-        }
-        updateGoogleApiKeyUi();
+      els.enableLiveRouting.addEventListener("change", () => {
+        const enabled = els.enableLiveRouting.checked;
+        try {
+          localStorage.setItem(ENABLE_LIVE_ROUTING_KEY, enabled ? "1" : "0");
+        } catch (e) {}
+        showToast(enabled ? "🟢 Đã bật định tuyến Live Traffic (Google)" : "⚪ Đã chuyển sang định tuyến OSRM");
         if (typeof googleRouteCache !== "undefined") googleRouteCache.clear();
         if (routeOrderKeys.length > 0 || (routeStartType && routeStartType.startsWith("shipper:") && routeReturnToShop)) {
           calculateAndDrawRoute();
@@ -1714,7 +1686,21 @@
       });
     }
 
-    updateGoogleApiKeyUi();
+    if (els.showOrderDetails) {
+      if (localStorage.getItem(SHOW_ORDER_DETAILS_KEY) !== null) {
+        els.showOrderDetails.checked = localStorage.getItem(SHOW_ORDER_DETAILS_KEY) !== "0";
+      } else {
+        els.showOrderDetails.checked = true;
+      }
+
+      els.showOrderDetails.addEventListener("change", () => {
+        const enabled = els.showOrderDetails.checked;
+        try {
+          localStorage.setItem(SHOW_ORDER_DETAILS_KEY, enabled ? "1" : "0");
+        } catch (e) {}
+        showToast(enabled ? "📋 Đã bật hiện chi tiết đơn khi bấm" : "⚡ Đã bật chọn ghép đơn nhanh (bỏ qua popup & zoom)");
+      });
+    }
 
     // Khôi phục bộ lọc trạng thái và hiển thị đã lưu
     const savedStatusFilter = localStorage.getItem(STATUS_FILTER_KEY);
@@ -2470,6 +2456,50 @@
 
         marker.on("click", () => {
           stopFollowShipper();
+          const shouldShowDetails = !els.showOrderDetails || els.showOrderDetails.checked;
+
+          if (!shouldShowDetails) {
+            setTimeout(() => {
+              marker.closePopup();
+              map.closePopup();
+            }, 0);
+
+            const inRoute = routeOrderKeys.includes(orderKey);
+
+            if (inRoute) {
+              // Bỏ đơn này khỏi lộ trình
+              routeOrderKeys = routeOrderKeys.filter(key => key !== orderKey);
+              if (routeOrderKeys.length === 0) {
+                isRoutingArmed = false;
+                lastInteractedOrderKey = null;
+                routeStartType = null;
+                routeReturnToShop = false;
+              } else {
+                lastInteractedOrderKey = routeOrderKeys[routeOrderKeys.length - 1];
+              }
+              updateRouteReadyOrderMarkerUi();
+              updateRouteToggleButtonsUi();
+              renderRoutePanelUi();
+              calculateAndDrawRoute();
+              if (routeOrderKeys.length === 0 && !routeStartType) {
+                toggleRoutePanel(false);
+              }
+              return;
+            }
+
+            // Đơn chưa có trong lộ trình: Thêm ngay vào lộ trình để ghép đơn
+            routeOrderKeys.push(orderKey);
+            isRoutingArmed = true;
+            lastInteractedOrderKey = orderKey;
+            updateRouteReadyOrderMarkerUi();
+            updateRouteToggleButtonsUi();
+            renderRoutePanelUi();
+            calculateAndDrawRoute();
+            toggleRoutePanel(true);
+            return;
+          }
+
+          // Khi BẬT "Hiện chi tiết đơn": Giữ nguyên hành vi mở popup & zoom
           const inRoute = routeOrderKeys.includes(orderKey);
 
           if (inRoute) {
@@ -2648,19 +2678,96 @@
 
     function renderRoutePanelUi() {
       updateRouteBadge();
+      updateRouteStatusToast();
       const renderId = ++routeAnalysisRenderId;
       updateRouteSuggestionBanner(renderId);
     }
 
     let toastTimer = null;
+    let persistentRouteToastMsg = "";
+
+    function hideToast() {
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = null;
+      persistentRouteToastMsg = "";
+      if (els.mapToast) {
+        els.mapToast.classList.remove("show");
+      }
+    }
+
     function showToast(message, duration = 2800) {
-      if (!els.mapToast) return;
+      if (!els.mapToast || !message) return;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = null;
+
       els.mapToast.textContent = message;
       els.mapToast.classList.add("show");
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => {
-        if (els.mapToast) els.mapToast.classList.remove("show");
-      }, duration);
+
+      if (duration > 0) {
+        toastTimer = setTimeout(() => {
+          if (persistentRouteToastMsg) {
+            els.mapToast.textContent = persistentRouteToastMsg;
+            els.mapToast.classList.add("show");
+          } else {
+            if (els.mapToast) els.mapToast.classList.remove("show");
+          }
+        }, duration);
+      }
+    }
+
+    function updateRouteStatusToast(customMsg) {
+      if (customMsg) {
+        persistentRouteToastMsg = customMsg;
+        showToast(customMsg, 0);
+        return;
+      }
+
+      if (!routeStartType && routeOrderKeys.length === 0) {
+        hideToast();
+        return;
+      }
+
+      let msg = "";
+      if (routeStartType && routeStartType.startsWith("shipper:")) {
+        const shipperKey = routeStartType.replace("shipper:", "");
+        const shipper = lastShippers.find(s => getShipperKey(s) === shipperKey);
+        const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
+
+        if (routeOrderKeys.length === 0) {
+          msg = routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ Về Quán!` : `🚗 Đã chọn ${shipperName} làm điểm xuất phát!`;
+        } else if (routeOrderKeys.length === 1) {
+          const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
+          const ordCode = ord?.code ? ` #${ord.code}` : "";
+          msg = routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ Đơn${ordCode} ➔ Về Quán!` : `🚗 Đã nối: ${shipperName} ➔ Đơn${ordCode}!`;
+        } else {
+          msg = routeReturnToShop ? `🏪 Đã nối: ${shipperName} ➔ ${routeOrderKeys.length} đơn ➔ Về Quán!` : `🚗 Đã nối: ${shipperName} ➔ ${routeOrderKeys.length} đơn!`;
+        }
+      } else if (routeStartType === "restaurant") {
+        if (routeOrderKeys.length === 0) {
+          msg = "🏪 Đã chọn Quán làm điểm xuất phát!";
+        } else if (routeOrderKeys.length === 1) {
+          const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
+          const ordCode = ord?.code ? ` #${ord.code}` : "";
+          msg = routeReturnToShop ? `🏪 Đã nối: Quán ➔ Đơn${ordCode} ➔ Về Quán!` : `🏪 Đã nối: Quán ➔ Đơn${ordCode}!`;
+        } else {
+          msg = routeReturnToShop ? `🏪 Đã nối: Quán ➔ ${routeOrderKeys.length} đơn ➔ Về Quán!` : `🏪 Đã nối: Quán ➔ ${routeOrderKeys.length} đơn!`;
+        }
+      } else if (routeOrderKeys.length > 0) {
+        if (routeOrderKeys.length === 1) {
+          const ord = lastOrders.find(o => getOrderKey(o) === routeOrderKeys[0]);
+          const ordCode = ord?.code ? ` #${ord.code}` : "";
+          msg = `📍 Đã chọn Đơn${ordCode} (Chờ chọn tiếp)`;
+        } else {
+          msg = `📍 Đã chọn ${routeOrderKeys.length} đơn`;
+        }
+      }
+
+      if (msg) {
+        persistentRouteToastMsg = msg;
+        showToast(msg, 0);
+      } else {
+        hideToast();
+      }
     }
 
     function parseOrderSchedule(order) {
@@ -4118,8 +4225,10 @@
 
       let route = null;
 
+      const isLiveRoutingEnabled = !els.enableLiveRouting || els.enableLiveRouting.checked;
+
       // 1. Thử tính lộ trình bằng Google Routes API (Live Traffic + Tự động tránh đường cấm ⛔)
-      if (googleRoutesApiKey && googleRoutesApiKey.trim().length > 10) {
+      if (isLiveRoutingEnabled && googleRoutesApiKey && googleRoutesApiKey.trim().length > 10) {
         try {
           route = await fetchGoogleRoute(waypoints);
         } catch (gErr) {
@@ -4463,6 +4572,11 @@
       const marker = shipperMarkers.get(key);
       const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
 
+      if (lastInteractedOrderKey && !routeOrderKeys.includes(lastInteractedOrderKey)) {
+        routeOrderKeys.push(lastInteractedOrderKey);
+      }
+      lastInteractedOrderKey = null;
+
       const prevStartType = routeStartType;
       // Nếu trước đó đã click Quán (routeStartType === "restaurant") hoặc đã có cờ về quán -> Luôn đi từ Shipper -> Về Quán
       if (prevStartType === "restaurant" || routeReturnToShop) {
@@ -4470,17 +4584,13 @@
       }
       routeStartType = `shipper:${key}`;
       isRoutingArmed = true;
-      lastInteractedOrderKey = null;
       updateRouteReadyOrderMarkerUi();
+      updateRouteToggleButtonsUi();
       renderRoutePanelUi();
       if (routeOrderKeys.length > 0 || routeReturnToShop) {
         calculateAndDrawRoute();
         toggleRoutePanel(true);
       }
-      const toastMsg = routeReturnToShop
-        ? (routeOrderKeys.length > 0 ? `🚗 ${shipperName} ➔ Đơn ➔ Về Quán` : `🚗 ${shipperName} ➔ Về Quán`)
-        : `🚗 Đã chọn ${shipperName} làm điểm xuất phát!`;
-      showToast(toastMsg);
 
       // Nếu bấm lại vào chính shipper đang bám đuôi -> hủy bám đuôi
       if (activeFollowShipperKey === key) {
@@ -4887,6 +4997,12 @@
         marker.on("click", () => {
           const key = getShipperKey(shipper);
           const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
+
+          if (lastInteractedOrderKey && !routeOrderKeys.includes(lastInteractedOrderKey)) {
+            routeOrderKeys.push(lastInteractedOrderKey);
+          }
+          lastInteractedOrderKey = null;
+
           const prevStartType = routeStartType;
           // Nếu trước đó đã click Quán (routeStartType === "restaurant") hoặc đã có cờ về quán -> Luôn đi từ Shipper -> Về Quán
           if (prevStartType === "restaurant" || routeReturnToShop) {
@@ -4894,17 +5010,13 @@
           }
           routeStartType = `shipper:${key}`;
           isRoutingArmed = true;
-          lastInteractedOrderKey = null;
           updateRouteReadyOrderMarkerUi();
+          updateRouteToggleButtonsUi();
           renderRoutePanelUi();
           if (routeOrderKeys.length > 0 || routeReturnToShop) {
             calculateAndDrawRoute();
             toggleRoutePanel(true);
           }
-          const toastMsg = routeReturnToShop
-            ? (routeOrderKeys.length > 0 ? `🚗 ${shipperName} ➔ Đơn ➔ Về Quán` : `🚗 ${shipperName} ➔ Về Quán`)
-            : `🚗 Đã chọn ${shipperName} làm điểm xuất phát!`;
-          showToast(toastMsg);
         });
 
         shipperMarkers.set(getShipperKey(shipper), marker);
