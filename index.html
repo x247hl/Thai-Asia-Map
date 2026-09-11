@@ -1582,8 +1582,8 @@
     </div>
 
     <div class="update-row">
-      <span>Google thÃ¡ng nÃ y</span>
-      <strong id="googleUsageSummary">â€”</strong>
+      <span>Google tháng này</span>
+      <strong id="googleUsageSummary">—</strong>
     </div>
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
@@ -2299,7 +2299,7 @@
       const total = geocode + routes;
       const maxTotal = GOOGLE_GEOCODE_MONTHLY_LIMIT + GOOGLE_ROUTES_MONTHLY_LIMIT;
       els.googleUsageSummary.textContent = `${total}/${maxTotal} (GPS ${geocode}/${GOOGLE_GEOCODE_MONTHLY_LIMIT}, Route ${routes}/${GOOGLE_ROUTES_MONTHLY_LIMIT})`;
-      els.googleUsageSummary.title = `MÃ¡y nÃ y trong thÃ¡ng ${getLocalMonthKey()}`;
+      els.googleUsageSummary.title = `May nay trong thang ${getLocalMonthKey()}`;
     }
 
     updateGoogleUsageSummary();
