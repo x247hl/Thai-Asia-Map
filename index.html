@@ -1804,13 +1804,13 @@
         }
       }
 
-      // Mức Zoom 15 & 16 (Tải chi tiết khu vực trọng tâm Halle)
-      for (let z = 15; z <= 16; z++) {
+      // Mức Zoom 15, 16, 17, 18 (Tải chi tiết từng số nhà, ngõ ngách khu vực trọng tâm Halle)
+      for (let z = 15; z <= 18; z++) {
         const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
         const cy = Math.floor(
           ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
         );
-        const range = z === 15 ? 4 : 2;
+        const range = z === 15 ? 6 : z === 16 ? 4 : z === 17 ? 3 : 2;
         for (let dx = -range; dx <= range; dx++) {
           for (let dy = -range; dy <= range; dy++) {
             const x = cx + dx;
@@ -1821,20 +1821,20 @@
         }
       }
 
-      // Tải ngầm theo từng đợt nhẹ nhàng
+      // Tải ngầm 4 ô/lần cách nhau 25ms
       let index = 0;
       function fetchNextBatch() {
         if (index >= tileUrls.length) return;
-        const batch = tileUrls.slice(index, index + 3);
-        index += 3;
+        const batch = tileUrls.slice(index, index + 4);
+        index += 4;
         batch.forEach(url => fetch(url, { mode: "no-cors" }).catch(() => {}));
-        setTimeout(fetchNextBatch, 35);
+        setTimeout(fetchNextBatch, 25);
       }
 
       if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(fetchNextBatch, { timeout: 3000 });
+        window.requestIdleCallback(fetchNextBatch, { timeout: 2500 });
       } else {
-        setTimeout(fetchNextBatch, 2000);
+        setTimeout(fetchNextBatch, 1500);
       }
     }
 
