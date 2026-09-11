@@ -1726,7 +1726,6 @@
 
     // Tự động thử lại khi 1 mảnh tile bị lỗi mạng (Retry)
     baseTileLayer.on("tileerror", function (event) {
-      consecutiveTileErrors++;
       const tile = event.tile;
       const originalSrc = event.url || (tile && tile.src);
 
@@ -1742,75 +1741,35 @@
             }
             tile.src = retrySrc;
           }
-        }, 500);
+        }, 600);
       } else if (tile && tile._retryAttempt < 2) {
         tile._retryAttempt++;
         setTimeout(() => {
           if (tile && tile.parentElement) {
             tile.src = originalSrc.replace(/_retry=\d+/, "_retry=" + Date.now());
           }
-        }, 1200);
-      }
-
-      // Chỉ chuyển nguồn nếu đang online và Google Maps bị lỗi kéo dài (> 8 tiles)
-      if (consecutiveTileErrors >= 8 && activeTileSource === "google" && navigator.onLine) {
-        console.warn("⚠️ Google Maps tile server bị lỗi/bóp băng thông, tự động chuyển sang CartoDB dự phòng...");
-        activeTileSource = "carto";
-        baseTileLayer.setUrl(TILE_SOURCES.carto.getUrl());
-        baseTileLayer.options.subdomains = TILE_SOURCES.carto.subdomains;
-        baseTileLayer.redraw();
+        }, 1500);
       }
     });
 
     baseTileLayer.on("tileload", function () {
       totalBaseTilesLoaded++;
-      if (consecutiveTileErrors > 0) consecutiveTileErrors = Math.max(0, consecutiveTileErrors - 1);
     });
 
-    // Tự động tải trước toàn bộ vùng bán kính 30km từ quán (Load 1 lần nhớ mãi)
+    // Tự động nạp sẵn các mức Zoom chính (11 đến 16) khu vực Halle quanh quán vào máy
     function prefetchHalleMapTiles() {
       if (typeof window === "undefined") return;
 
       const lat = RESTAURANT.lat;
       const lng = RESTAURANT.lng;
-      const radiusKm = 30;
-
-      const dLat = radiusKm / 111.32;
-      const dLng = radiusKm / (111.32 * Math.cos((lat * Math.PI) / 180));
-
-      const minLat = lat - dLat;
-      const maxLat = lat + dLat;
-      const minLng = lng - dLng;
-      const maxLng = lng + dLng;
-
       const tileUrls = [];
 
-      // Mức Zoom 11 -> 14 (Phủ kín 100% toàn bộ diện tích bán kính 30km)
-      for (let z = 11; z <= 14; z++) {
-        const minX = Math.floor(((minLng + 180) / 360) * Math.pow(2, z));
-        const maxX = Math.floor(((maxLng + 180) / 360) * Math.pow(2, z));
-        const minY = Math.floor(
-          ((1 - Math.log(Math.tan((maxLat * Math.PI) / 180) + 1 / Math.cos((maxLat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
-        );
-        const maxY = Math.floor(
-          ((1 - Math.log(Math.tan((minLat * Math.PI) / 180) + 1 / Math.cos((minLat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
-        );
-
-        for (let x = minX; x <= maxX; x++) {
-          for (let y = minY; y <= maxY; y++) {
-            const sub = ["mt0", "mt1", "mt2", "mt3"][(x + y) % 4];
-            tileUrls.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
-          }
-        }
-      }
-
-      // Mức Zoom 15, 16, 17, 18 (Tải chi tiết từng số nhà, ngõ ngách khu vực trọng tâm Halle)
-      for (let z = 15; z <= 18; z++) {
+      for (let z = 11; z <= 16; z++) {
         const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
         const cy = Math.floor(
           ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
         );
-        const range = z === 15 ? 6 : z === 16 ? 4 : z === 17 ? 3 : 2;
+        const range = (z === 11 || z === 12) ? 2 : 1; // Lưới 5x5 ở Z11-Z12, 3x3 ở Z13-Z16
         for (let dx = -range; dx <= range; dx++) {
           for (let dy = -range; dy <= range; dy++) {
             const x = cx + dx;
@@ -1821,20 +1780,19 @@
         }
       }
 
-      // Tải ngầm 4 ô/lần cách nhau 25ms
+      // Nạp ngầm nhẹ nhàng từng ô cách nhau 80ms để không bị Google bóp băng thông
       let index = 0;
       function fetchNextBatch() {
         if (index >= tileUrls.length) return;
-        const batch = tileUrls.slice(index, index + 4);
-        index += 4;
-        batch.forEach(url => fetch(url, { mode: "no-cors" }).catch(() => {}));
-        setTimeout(fetchNextBatch, 25);
+        const url = tileUrls[index++];
+        fetch(url, { mode: "no-cors" }).catch(() => {});
+        setTimeout(fetchNextBatch, 80);
       }
 
       if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(fetchNextBatch, { timeout: 2500 });
+        window.requestIdleCallback(fetchNextBatch, { timeout: 3000 });
       } else {
-        setTimeout(fetchNextBatch, 1500);
+        setTimeout(fetchNextBatch, 2000);
       }
     }
 
