@@ -1698,8 +1698,8 @@
       maxZoom: 20,
       subdomains: ["mt0", "mt1", "mt2", "mt3"],
       tileSize: 256,
-      updateWhenZooming: false,
-      updateWhenIdle: true,
+      updateWhenZooming: true,
+      updateWhenIdle: false,
       keepBuffer: 3
     }).addTo(map);
 
@@ -1712,22 +1712,9 @@
         tile._retryAttempt = 1;
         setTimeout(() => {
           if (tile && tile.parentElement) {
-            const subs = ["mt1", "mt2", "mt3", "mt0"];
-            const nextSub = subs[Math.floor(Math.random() * subs.length)];
-            let retrySrc = originalSrc.replace(/mt[0-3]/, nextSub);
-            if (!retrySrc.includes("_retry=")) {
-              retrySrc += (retrySrc.includes("?") ? "&" : "?") + "_retry=" + Date.now();
-            }
-            tile.src = retrySrc;
+            tile.src = originalSrc;
           }
-        }, 600);
-      } else if (tile && tile._retryAttempt < 2) {
-        tile._retryAttempt++;
-        setTimeout(() => {
-          if (tile && tile.parentElement) {
-            tile.src = originalSrc.replace(/_retry=\d+/, "_retry=" + Date.now());
-          }
-        }, 1500);
+        }, 1200);
       }
     });
 
@@ -1735,45 +1722,42 @@
       totalBaseTilesLoaded++;
     });
 
-    // Tự động nạp sẵn các mức Zoom từ 11 đến 16 phủ kín toàn bộ thành phố Halle vào máy (Load 1 lần nhớ mãi)
-    function prefetchHalleMapTiles() {
+    // Tự động nạp sẵn nhẹ nhàng khu vực trung tâm quán lúc rảnh (không làm nghẽn mạng)
+    function prefetchGentleMapTiles() {
       if (typeof window === "undefined") return;
 
       const lat = RESTAURANT.lat;
       const lng = RESTAURANT.lng;
       const tileUrls = [];
-      const ranges = { 11: 2, 12: 3, 13: 4, 14: 6, 15: 9, 16: 15 };
+      const levels = [13, 14, 15]; // Nạp sẵn 3 mức Zoom thông dụng quanh quán
 
-      for (let z = 11; z <= 16; z++) {
+      levels.forEach(z => {
         const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
         const cy = Math.floor(
           ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
         );
-        const range = ranges[z] || 2;
-        for (let dx = -range; dx <= range; dx++) {
-          for (let dy = -range; dy <= range; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
             const x = cx + dx;
             const y = cy + dy;
             const sub = ["mt0", "mt1", "mt2", "mt3"][(x + y) % 4];
             tileUrls.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
           }
         }
-      }
+      });
 
-      // Tải ngầm 4 ô mỗi đợt cách nhau 30ms (tổng cộng ~12-15s là nạp xong trọn vẹn toàn bộ Halle từ Z11 đến Z16)
-      let index = 0;
-      function fetchNextBatch() {
-        if (index >= tileUrls.length) return;
-        const batch = tileUrls.slice(index, index + 4);
-        index += 4;
-        batch.forEach(url => fetch(url, { mode: "no-cors" }).catch(() => {}));
-        setTimeout(fetchNextBatch, 30);
+      let idx = 0;
+      function fetchNextGentle() {
+        if (idx >= tileUrls.length) return;
+        const url = tileUrls[idx++];
+        fetch(url, { mode: "no-cors" }).catch(() => {});
+        setTimeout(fetchNextGentle, 120);
       }
 
       if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(fetchNextBatch, { timeout: 2500 });
+        window.requestIdleCallback(fetchNextGentle, { timeout: 3000 });
       } else {
-        setTimeout(fetchNextBatch, 1500);
+        setTimeout(fetchNextGentle, 2000);
       }
     }
 
@@ -1784,7 +1768,7 @@
         setExactMapDimensions();
         baseTileLayer.redraw();
       }
-      prefetchHalleMapTiles();
+      prefetchGentleMapTiles();
     }, 2500);
 
     const orderLayer = L.layerGroup().addTo(map);

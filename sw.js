@@ -1,4 +1,4 @@
-const CACHE_NAME = "thaiasia-map-v88";
+const CACHE_NAME = "thaiasia-map-v89";
 const TILES_CACHE_NAME = "thaiasia-tiles-v1";
 const MAX_CACHED_TILES = 10000;
 
@@ -30,6 +30,20 @@ self.addEventListener("install", event => {
   self.skipWaiting();
 });
 
+// Giới hạn dung lượng cache tile nếu vượt quá 10.000 ô (chạy ngầm lúc activate, không chặn fetch)
+async function pruneTilesCacheIfNeeded() {
+  try {
+    const cache = await caches.open(TILES_CACHE_NAME);
+    const keys = await cache.keys();
+    if (keys.length > MAX_CACHED_TILES) {
+      const deleteCount = keys.length - MAX_CACHED_TILES;
+      for (let i = 0; i < deleteCount; i++) {
+        await cache.delete(keys[i]);
+      }
+    }
+  } catch (e) { }
+}
+
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -38,23 +52,10 @@ self.addEventListener("activate", event => {
           .filter(k => k !== CACHE_NAME && k !== TILES_CACHE_NAME)
           .map(k => caches.delete(k))
       )
-    )
+    ).then(() => pruneTilesCacheIfNeeded())
   );
   self.clients.claim();
 });
-
-async function limitCacheSize(cacheName, maxItems) {
-  try {
-    const cache = await caches.open(cacheName);
-    const keys = await cache.keys();
-    if (keys.length > maxItems) {
-      const deleteCount = keys.length - maxItems;
-      for (let i = 0; i < deleteCount; i++) {
-        await cache.delete(keys[i]);
-      }
-    }
-  } catch (e) { }
-}
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
@@ -66,8 +67,9 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // 2. Mảnh bản đồ Google Maps / OSM / CartoDB -> Chiến lược "Load 1 lần nhớ mãi"
-  // Đã tải 1 lần là lưu vĩnh viễn trên máy, mở lại nạp tức thì 0ms, không sợ mất mạng
+  // 2. Mảnh bản đồ Google Maps / OSM / CartoDB -> Chiến lược Cache-First ("Load 1 lần nhớ mãi")
+  // Nếu đã xem qua rồi -> nạp tức thì 0ms từ bộ nhớ máy, siêu mượt, không tốn mạng
+  // Nếu chưa có -> tải từ mạng và tự động lưu vào máy vĩnh viễn
   const isMapTile =
     url.hostname.includes("google.com") ||
     url.hostname.includes("tile.openstreetmap") ||
@@ -76,21 +78,22 @@ self.addEventListener("fetch", event => {
   if (isMapTile && (url.pathname.includes("/vt/") || url.pathname.endsWith(".png"))) {
     event.respondWith(
       caches.open(TILES_CACHE_NAME).then(async cache => {
+        // 1. Đọc từ cache trước (0ms)
         const cachedResponse = await cache.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
 
-        const fetchPromise = fetch(event.request)
-          .then(networkResponse => {
-            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === "opaque")) {
-              const copy = networkResponse.clone();
-              cache.put(event.request, copy);
-              limitCacheSize(TILES_CACHE_NAME, MAX_CACHED_TILES);
-            }
-            return networkResponse;
-          })
-          .catch(() => cachedResponse);
-
-        // Nếu đã có sẵn trên máy -> trả về ngay 0ms, đồng thời chạy ngầm cập nhật
-        return cachedResponse || fetchPromise;
+        // 2. Chưa có trong cache -> tải từ mạng và lưu vào máy
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === "opaque")) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch (err) {
+          return cachedResponse || new Response("", { status: 408, headers: { "Content-Type": "image/png" } });
+        }
       })
     );
     return;
