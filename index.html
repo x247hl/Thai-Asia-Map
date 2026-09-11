@@ -2309,9 +2309,7 @@
       if (!els.googleUsageSummary) return;
       const geocode = getGoogleMonthlyUsage("geocode").count;
       const routes = getGoogleMonthlyUsage("routes").count;
-      const total = geocode + routes;
-      const maxTotal = GOOGLE_GEOCODE_MONTHLY_LIMIT + GOOGLE_ROUTES_MONTHLY_LIMIT;
-      els.googleUsageSummary.textContent = `${total}/${maxTotal} (GPS ${geocode}/${GOOGLE_GEOCODE_MONTHLY_LIMIT}, Route ${routes}/${GOOGLE_ROUTES_MONTHLY_LIMIT})`;
+      els.googleUsageSummary.textContent = `GPS ${geocode}/${GOOGLE_GEOCODE_MONTHLY_LIMIT} | Route ${routes}/${GOOGLE_ROUTES_MONTHLY_LIMIT}`;
       els.googleUsageSummary.title = `May nay trong thang ${getLocalMonthKey()}`;
     }
 
