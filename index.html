@@ -283,6 +283,14 @@
       color: #777;
       display: flex;
       justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .update-row strong {
+      color: #333;
+      font-weight: 700;
+      text-align: right;
     }
 
     .order-marker {
@@ -1573,6 +1581,11 @@
       <span id="lastUpdate">—</span>
     </div>
 
+    <div class="update-row">
+      <span>Google thÃ¡ng nÃ y</span>
+      <strong id="googleUsageSummary">â€”</strong>
+    </div>
+
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
       <span style="font-weight: 700; color: #7c3aed;">v90</span>
@@ -1605,6 +1618,10 @@
     const ROUTE_NORMAL_WAIT_TARGET_MIN = 28;
     const ROUTE_NORMAL_WAIT_LIMIT_MIN = 35;
     const ROUTE_OSRM_TABLE_URL = "https://router.project-osrm.org/table/v1/driving";
+    const GOOGLE_GEOCODE_MONTHLY_LIMIT = 1500;
+    const GOOGLE_ROUTES_MONTHLY_LIMIT = 3000;
+    const GOOGLE_ROUTE_CACHE_TTL_MS = 15 * 60 * 1000;
+    const GOOGLE_SHIPPER_ROUTE_CACHE_TTL_MS = 5 * 60 * 1000;
 
     // Thai Asia SushiBar, Leipziger Chaussee 147, Halle (Saale)
     const RESTAURANT = {
@@ -1881,7 +1898,8 @@
       currentZoom: document.getElementById("currentZoom"),
       shipperStatusList: document.getElementById("shipperStatusList"),
       shipperSettingList: document.getElementById("shipperSettingList"),
-      lastUpdate: document.getElementById("lastUpdate")
+      lastUpdate: document.getElementById("lastUpdate"),
+      googleUsageSummary: document.getElementById("googleUsageSummary")
     };
 
     const DEFAULT_GOOGLE_ROUTES_API_KEY = "AIzaSyBCB0wI2tOTlRVbj_bSQ43cWzHfAlgPBy0";
@@ -2235,6 +2253,57 @@
       return Number.isFinite(n) ? n : null;
     }
 
+    function getLocalMonthKey() {
+      const d = new Date();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      return `${d.getFullYear()}-${m}`;
+    }
+
+    function getGoogleMonthlyUsage(kind) {
+      const storageKey = `thaiasia.googleMonthly.${kind}`;
+      const month = getLocalMonthKey();
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
+        if (saved && saved.month === month) {
+          return {
+            storageKey,
+            month,
+            count: Math.max(0, Number(saved.count) || 0)
+          };
+        }
+      } catch (e) { }
+      return { storageKey, month, count: 0 };
+    }
+
+    function canUseGoogleMonthly(kind, limit) {
+      return getGoogleMonthlyUsage(kind).count < limit;
+    }
+
+    function markGoogleMonthlyUse(kind) {
+      const usage = getGoogleMonthlyUsage(kind);
+      usage.count += 1;
+      try {
+        localStorage.setItem(usage.storageKey, JSON.stringify({
+          month: usage.month,
+          count: usage.count
+        }));
+      } catch (e) { }
+      updateGoogleUsageSummary();
+      return usage.count;
+    }
+
+    function updateGoogleUsageSummary() {
+      if (!els.googleUsageSummary) return;
+      const geocode = getGoogleMonthlyUsage("geocode").count;
+      const routes = getGoogleMonthlyUsage("routes").count;
+      const total = geocode + routes;
+      const maxTotal = GOOGLE_GEOCODE_MONTHLY_LIMIT + GOOGLE_ROUTES_MONTHLY_LIMIT;
+      els.googleUsageSummary.textContent = `${total}/${maxTotal} (GPS ${geocode}/${GOOGLE_GEOCODE_MONTHLY_LIMIT}, Route ${routes}/${GOOGLE_ROUTES_MONTHLY_LIMIT})`;
+      els.googleUsageSummary.title = `MÃ¡y nÃ y trong thÃ¡ng ${getLocalMonthKey()}`;
+    }
+
+    updateGoogleUsageSummary();
+
     function unwrapList(payload) {
       if (Array.isArray(payload)) return payload;
       if (Array.isArray(payload?.data)) return payload.data;
@@ -2348,6 +2417,11 @@
         .trim();
     }
 
+    function canRequestGoogleGeocodeForOrder(order) {
+      const status = String(order?.status || "").toLowerCase();
+      return status !== "complete" && status !== "cancel";
+    }
+
     async function geocodeOrderAddress(order) {
       const rawAddress = formatOrderAddress(order);
       if (!rawAddress || rawAddress.trim().length < 3) {
@@ -2385,6 +2459,15 @@
         return googleGeocodeInFlight.get(normKey);
       }
 
+      if (!canRequestGoogleGeocodeForOrder(order)) {
+        return null;
+      }
+
+      if (!canUseGoogleMonthly("geocode", GOOGLE_GEOCODE_MONTHLY_LIMIT)) {
+        console.warn(`[Google GPS] Monthly geocode limit reached (${GOOGLE_GEOCODE_MONTHLY_LIMIT}). Using backend coordinates until next month.`);
+        return null;
+      }
+
       const apiKey = (googleRoutesApiKey || "").trim();
       if (!apiKey || apiKey.length < 10) {
         return null;
@@ -2398,6 +2481,7 @@
             : `${rawAddress}, Halle (Saale), Germany`;
 
           const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryAddr)}&key=${apiKey}&language=vi`;
+          markGoogleMonthlyUse("geocode");
           const res = await fetch(url);
           if (res.status === 429 || res.status === 403) {
             // Hết hạn mức hoặc bị giới hạn -> Tự động tắt Google GPS 15 phút, chuyển về tọa độ cũ
@@ -4419,6 +4503,35 @@
     // ===== GOOGLE ROUTES API CLIENT (LIVE TRAFFIC & CẤM ĐƯỜNG ⛔) =====
     const googleRouteCache = new Map();
 
+    function getGoogleRouteCacheTtl() {
+      return routeStartType && routeStartType.startsWith("shipper:")
+        ? GOOGLE_SHIPPER_ROUTE_CACHE_TTL_MS
+        : GOOGLE_ROUTE_CACHE_TTL_MS;
+    }
+
+    function getStoredGoogleRoute(cacheKey, ttlMs) {
+      try {
+        const storageKey = `thaiasia.googleRoute.${hashString(cacheKey)}`;
+        const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+        if (!saved || !saved.timestamp || !saved.data) return null;
+        if (Date.now() - saved.timestamp > ttlMs) return null;
+        if (!Array.isArray(saved.data.latLngs) || saved.data.provider !== "google") return null;
+        return saved.data;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function storeGoogleRoute(cacheKey, data) {
+      try {
+        const storageKey = `thaiasia.googleRoute.${hashString(cacheKey)}`;
+        localStorage.setItem(storageKey, JSON.stringify({
+          timestamp: Date.now(),
+          data
+        }));
+      } catch (e) { }
+    }
+
     function decodeGooglePolyline(encoded) {
       if (!encoded || typeof encoded !== "string") return [];
       const points = [];
@@ -4455,10 +4568,25 @@
         return null;
       }
 
-      const cacheKey = waypoints.map(pt => `${Number(pt[0]).toFixed(5)},${Number(pt[1]).toFixed(5)}`).join("::");
+      const cacheKey = waypoints.map(pt => `${Number(pt[0]).toFixed(4)},${Number(pt[1]).toFixed(4)}`).join("::");
+      const cacheTtl = getGoogleRouteCacheTtl();
       const cached = googleRouteCache.get(cacheKey);
-      if (cached && (Date.now() - cached.timestamp < 60000)) {
+      if (cached && (Date.now() - cached.timestamp < cacheTtl)) {
         return cached.data;
+      }
+
+      const stored = getStoredGoogleRoute(cacheKey, cacheTtl);
+      if (stored) {
+        googleRouteCache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: stored
+        });
+        return stored;
+      }
+
+      if (!canUseGoogleMonthly("routes", GOOGLE_ROUTES_MONTHLY_LIMIT)) {
+        console.warn(`[Google Routes] Monthly routes limit reached (${GOOGLE_ROUTES_MONTHLY_LIMIT}). Falling back to OSRM until next month.`);
+        return null;
       }
 
       const origin = { location: { latLng: { latitude: waypoints[0][1], longitude: waypoints[0][0] } } };
@@ -4481,6 +4609,7 @@
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6500);
+        markGoogleMonthlyUse("routes");
         const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
           method: "POST",
           headers: {
@@ -4529,6 +4658,7 @@
           timestamp: Date.now(),
           data: result
         });
+        storeGoogleRoute(cacheKey, result);
 
         return result;
       } catch (err) {
