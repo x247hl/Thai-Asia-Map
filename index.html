@@ -1622,6 +1622,7 @@
     const GOOGLE_ROUTES_MONTHLY_LIMIT = 2200;
     const GOOGLE_ROUTE_CACHE_TTL_MS = 15 * 60 * 1000;
     const GOOGLE_SHIPPER_ROUTE_CACHE_TTL_MS = 5 * 60 * 1000;
+    const TRAFFIC_TILE_REFRESH_MS = 10 * 60 * 1000;
 
     // Thai Asia SushiBar, Leipziger Chaussee 147, Halle (Saale)
     const RESTAURANT = {
@@ -1709,6 +1710,7 @@
 
     let totalBaseTilesLoaded = 0;
     let isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
+    let lastTrafficTileRefreshAt = 0;
 
     // Nền bản đồ chính: 100% Google Maps (hỗ trợ hiển thị giao thông và lưu đệm Cache vĩnh viễn, chuẩn Retina 512px siêu nét)
     const baseTileLayer = L.tileLayer(getGoogleMapTileUrl(isTrafficEnabled), {
@@ -1738,6 +1740,14 @@
     baseTileLayer.on("tileload", function () {
       totalBaseTilesLoaded++;
     });
+
+    function refreshTrafficTilesIfNeeded(force = false) {
+      if (document.hidden || !isTrafficEnabled || !map.hasLayer(baseTileLayer)) return;
+      const now = Date.now();
+      if (!force && (now - lastTrafficTileRefreshAt < TRAFFIC_TILE_REFRESH_MS)) return;
+      lastTrafficTileRefreshAt = now;
+      baseTileLayer.redraw();
+    }
 
     // Tự động nạp sẵn nhẹ nhàng khu vực trung tâm quán lúc rảnh (không làm nghẽn mạng)
     function prefetchGentleMapTiles() {
@@ -2237,6 +2247,9 @@
       } catch (err) { }
 
       baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
+      if (enabled) {
+        refreshTrafficTilesIfNeeded(true);
+      }
     });
 
     function escapeHtml(value) {
@@ -5656,10 +5669,8 @@
 
       if (!trafficTimer) {
         trafficTimer = setInterval(() => {
-          if (!document.hidden && isTrafficEnabled && activeTileSource === "google") {
-            baseTileLayer.redraw();
-          }
-        }, 120000);
+          refreshTrafficTilesIfNeeded(false);
+        }, TRAFFIC_TILE_REFRESH_MS);
       }
     }
 
