@@ -5662,10 +5662,22 @@
   </script>
 
   <script>
-    if ("serviceWorker" in navigator && location.protocol === "https:") {
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+      let isRefreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!isRefreshing) {
+          isRefreshing = true;
+          window.location.reload();
+        }
+      });
+
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("sw.js").then(reg => {
           reg.update();
+          // Kiểm tra bản mới định kỳ mỗi 60 giây khi đang mở app
+          setInterval(() => {
+            reg.update();
+          }, 60000);
         }).catch(err => {
           console.warn("Service Worker không đăng ký được:", err);
         });
