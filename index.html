@@ -1690,34 +1690,13 @@
       return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}`;
     }
 
-    // Nguồn bản đồ nền & Nguồn dự phòng (Fallback)
-    const TILE_SOURCES = {
-      google: {
-        getUrl: (traffic) => getGoogleMapTileUrl(traffic),
-        subdomains: ["mt0", "mt1", "mt2", "mt3"],
-        maxZoom: 20
-      },
-      carto: {
-        getUrl: () => "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        subdomains: ["a", "b", "c", "d"],
-        maxZoom: 19
-      },
-      osm: {
-        getUrl: () => "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        subdomains: ["a", "b", "c"],
-        maxZoom: 19
-      }
-    };
-
-    let activeTileSource = "google";
-    let consecutiveTileErrors = 0;
     let totalBaseTilesLoaded = 0;
     let isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
 
-    // Nền bản đồ chính (Google Maps có/không traffic, lưu đệm Cache trong Service Worker)
-    const baseTileLayer = L.tileLayer(TILE_SOURCES.google.getUrl(isTrafficEnabled), {
+    // Nền bản đồ chính: 100% Google Maps (hỗ trợ hiển thị giao thông và lưu đệm Cache vĩnh viễn)
+    const baseTileLayer = L.tileLayer(getGoogleMapTileUrl(isTrafficEnabled), {
       maxZoom: 20,
-      subdomains: TILE_SOURCES.google.subdomains,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
       tileSize: 256,
       updateWhenZooming: false,
       updateWhenIdle: true,
@@ -2253,9 +2232,7 @@
         localStorage.setItem("thaiasia.showTraffic", enabled ? "1" : "0");
       } catch (err) { }
 
-      if (activeTileSource === "google") {
-        baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
-      }
+      baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
     });
 
     function escapeHtml(value) {
