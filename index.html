@@ -1685,20 +1685,25 @@
       map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
     }
 
-    // Nguồn bản đồ nền tĩnh & Nguồn dự phòng (Fallback)
+    function getGoogleMapTileUrl(withTraffic) {
+      const lyr = withTraffic ? "m,traffic" : "m";
+      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}`;
+    }
+
+    // Nguồn bản đồ nền & Nguồn dự phòng (Fallback)
     const TILE_SOURCES = {
       google: {
-        url: "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        getUrl: (traffic) => getGoogleMapTileUrl(traffic),
         subdomains: ["mt0", "mt1", "mt2", "mt3"],
         maxZoom: 20
       },
       carto: {
-        url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        getUrl: () => "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
         subdomains: ["a", "b", "c", "d"],
         maxZoom: 19
       },
       osm: {
-        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        getUrl: () => "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         subdomains: ["a", "b", "c"],
         maxZoom: 19
       }
@@ -1709,31 +1714,15 @@
     let totalBaseTilesLoaded = 0;
     let isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
 
-    // 1. Nền bản đồ tĩnh (Base Map Layer) - Lưu đệm Cache-First trong Service Worker (0ms, không phụ thuộc mạng)
-    const baseTileLayer = L.tileLayer(TILE_SOURCES.google.url, {
+    // Nền bản đồ chính (Google Maps có/không traffic, lưu đệm Cache trong Service Worker)
+    const baseTileLayer = L.tileLayer(TILE_SOURCES.google.getUrl(isTrafficEnabled), {
       maxZoom: 20,
       subdomains: TILE_SOURCES.google.subdomains,
       tileSize: 256,
       updateWhenZooming: false,
       updateWhenIdle: true,
-      keepBuffer: 3,
-      crossOrigin: true
+      keepBuffer: 3
     }).addTo(map);
-
-    // 2. Lớp giao thông trực tiếp (Traffic Overlay Layer) - Trong suốt, tải đè lên nền tĩnh
-    const trafficTileLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=traffic&x={x}&y={y}&z={z}", {
-      maxZoom: 20,
-      subdomains: ["mt0", "mt1", "mt2", "mt3"],
-      tileSize: 256,
-      opacity: 0.9,
-      updateWhenZooming: false,
-      updateWhenIdle: true,
-      crossOrigin: true
-    });
-
-    if (isTrafficEnabled) {
-      trafficTileLayer.addTo(map);
-    }
 
     // Tự động thử lại khi 1 mảnh tile bị lỗi mạng (Retry)
     baseTileLayer.on("tileerror", function (event) {
@@ -1767,7 +1756,7 @@
       if (consecutiveTileErrors >= 6 && activeTileSource === "google") {
         console.warn("⚠️ Google Maps tile server bị lỗi/bóp băng thông, tự động chuyển sang CartoDB dự phòng...");
         activeTileSource = "carto";
-        baseTileLayer.setUrl(TILE_SOURCES.carto.url);
+        baseTileLayer.setUrl(TILE_SOURCES.carto.getUrl());
         baseTileLayer.options.subdomains = TILE_SOURCES.carto.subdomains;
         baseTileLayer.redraw();
       }
@@ -1778,32 +1767,20 @@
       if (consecutiveTileErrors > 0) consecutiveTileErrors = Math.max(0, consecutiveTileErrors - 1);
     });
 
-    trafficTileLayer.on("tileerror", function (event) {
-      const tile = event.tile;
-      if (tile && !tile._trafficRetry) {
-        tile._trafficRetry = 1;
-        setTimeout(() => {
-          if (tile && tile.parentElement) {
-            tile.src = event.url;
-          }
-        }, 1000);
-      }
-    });
-
     // Tải sẵn các ô bản đồ trọng tâm Halle (Saale) vào bộ nhớ máy (Pre-cache)
     function prefetchHalleMapTiles() {
-      if (typeof window === "undefined" || !("caches" in window)) return;
+      if (typeof window === "undefined") return;
       const coreHalleTiles = [
-        "https://mt0.google.com/vt/lyrs=m&x=1098&y=671&z=11",
-        "https://mt1.google.com/vt/lyrs=m&x=1099&y=671&z=11",
-        "https://mt0.google.com/vt/lyrs=m&x=2197&y=1342&z=12",
-        "https://mt1.google.com/vt/lyrs=m&x=2198&y=1342&z=12",
-        "https://mt2.google.com/vt/lyrs=m&x=2197&y=1343&z=12",
-        "https://mt3.google.com/vt/lyrs=m&x=2198&y=1343&z=12",
-        "https://mt0.google.com/vt/lyrs=m&x=4395&y=2685&z=13",
-        "https://mt1.google.com/vt/lyrs=m&x=4396&y=2685&z=13",
-        "https://mt2.google.com/vt/lyrs=m&x=4395&y=2686&z=13",
-        "https://mt3.google.com/vt/lyrs=m&x=4396&y=2686&z=13"
+        "https://mt0.google.com/vt/lyrs=m,traffic&x=1098&y=671&z=11",
+        "https://mt1.google.com/vt/lyrs=m,traffic&x=1099&y=671&z=11",
+        "https://mt0.google.com/vt/lyrs=m,traffic&x=2197&y=1342&z=12",
+        "https://mt1.google.com/vt/lyrs=m,traffic&x=2198&y=1342&z=12",
+        "https://mt2.google.com/vt/lyrs=m,traffic&x=2197&y=1343&z=12",
+        "https://mt3.google.com/vt/lyrs=m,traffic&x=2198&y=1343&z=12",
+        "https://mt0.google.com/vt/lyrs=m,traffic&x=4395&y=2685&z=13",
+        "https://mt1.google.com/vt/lyrs=m,traffic&x=4396&y=2685&z=13",
+        "https://mt2.google.com/vt/lyrs=m,traffic&x=4395&y=2686&z=13",
+        "https://mt3.google.com/vt/lyrs=m,traffic&x=4396&y=2686&z=13"
       ];
 
       const runPrefetch = () => {
@@ -1827,9 +1804,6 @@
         console.warn("⚠️ Watchdog: Chưa có tile nào sau 2.5s, tự động kích hoạt tải lại...");
         setExactMapDimensions();
         baseTileLayer.redraw();
-        if (isTrafficEnabled && map.hasLayer(trafficTileLayer)) {
-          trafficTileLayer.redraw();
-        }
       }
       prefetchHalleMapTiles();
     }, 2500);
@@ -2281,15 +2255,8 @@
         localStorage.setItem("thaiasia.showTraffic", enabled ? "1" : "0");
       } catch (err) { }
 
-      if (enabled) {
-        if (!map.hasLayer(trafficTileLayer)) {
-          trafficTileLayer.addTo(map);
-        }
-        trafficTileLayer.redraw();
-      } else {
-        if (map.hasLayer(trafficTileLayer)) {
-          map.removeLayer(trafficTileLayer);
-        }
+      if (activeTileSource === "google") {
+        baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
       }
     });
 
@@ -5598,8 +5565,8 @@
 
       if (!trafficTimer) {
         trafficTimer = setInterval(() => {
-          if (!document.hidden && isTrafficEnabled && map && map.hasLayer(trafficTileLayer)) {
-            trafficTileLayer.redraw();
+          if (!document.hidden && isTrafficEnabled && activeTileSource === "google") {
+            baseTileLayer.redraw();
           }
         }, 120000);
       }

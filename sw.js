@@ -22,9 +22,10 @@ const APP_SHELL = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(APP_SHELL);
-    })
+    Promise.all([
+      caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)),
+      caches.open(TILES_CACHE_NAME)
+    ])
   );
   self.skipWaiting();
 });
@@ -42,7 +43,6 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 });
 
-// Giới hạn số lượng tile lưu trong bộ nhớ đệm để không tốn dung lượng máy
 async function limitCacheSize(cacheName, maxItems) {
   try {
     const cache = await caches.open(cacheName);
@@ -59,52 +59,45 @@ async function limitCacheSize(cacheName, maxItems) {
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
-  const fullUrl = event.request.url;
+  const url = new URL(event.request.url);
 
-  // 1. Tuyệt đối không cache API để trạng thái đơn/shipper luôn lấy dữ liệu mới nhất
+  // 1. Không cache API đơn hàng/shipper
   if (url.hostname === "api.thaiasiasushibar.de") {
     return;
   }
 
-  // 2. Không cache lớp giao thông trực tiếp (traffic overlay) vì thay đổi từng phút
-  if (fullUrl.includes("lyrs=traffic") || fullUrl.includes("lyrs=h,traffic")) {
-    return;
-  }
-
-  // 3. Cache-First cho các mảnh bản đồ nền tĩnh (Google Maps base 'lyrs=m', OSM, CartoDB)
-  const isBaseTile =
-    (url.hostname.includes("google.com") && fullUrl.includes("lyrs=m")) ||
-    url.hostname.includes("tile.openstreetmap.org") ||
-    url.hostname.includes("tile.openstreetmap.de") ||
+  // 2. Mảnh bản đồ Google Maps (có/không traffic) / OSM / CartoDB
+  // Sử dụng Network-First khi có mạng (để luôn cập nhật tình trạng giao thông mới nhất)
+  // và tự động lưu vào CacheStorage để xem được Offline khi mất mạng / chế độ máy bay
+  const isMapTile =
+    url.hostname.includes("google.com") ||
+    url.hostname.includes("tile.openstreetmap") ||
     url.hostname.includes("cartocdn.com");
 
-  if (isBaseTile) {
+  if (isMapTile && (url.pathname.includes("/vt/") || url.pathname.endsWith(".png"))) {
     event.respondWith(
-      caches.open(TILES_CACHE_NAME).then(async cache => {
-        const cachedResponse = await cache.match(event.request);
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        try {
-          const networkResponse = await fetch(event.request);
+      fetch(event.request)
+        .then(networkResponse => {
           if (networkResponse && (networkResponse.status === 200 || networkResponse.type === "opaque")) {
-            cache.put(event.request, networkResponse.clone());
-            limitCacheSize(TILES_CACHE_NAME, MAX_CACHED_TILES);
+            const copy = networkResponse.clone();
+            caches.open(TILES_CACHE_NAME).then(cache => {
+              cache.put(event.request, copy);
+              limitCacheSize(TILES_CACHE_NAME, MAX_CACHED_TILES);
+            });
           }
           return networkResponse;
-        } catch (err) {
-          return cachedResponse || Promise.reject(err);
-        }
-      })
+        })
+        .catch(() => {
+          return caches.open(TILES_CACHE_NAME).then(cache => cache.match(event.request));
+        })
     );
     return;
   }
 
-  // 4. Tài nguyên App Shell cục bộ (HTML, JS, CSS, Icons)
+  // 3. Tài nguyên App Shell cục bộ (HTML, JS, CSS, PNG)
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(event.request).then(cached => {
-        // Nếu là file tĩnh (Leaflet, ảnh, manifest): trả về cache ngay (0ms)
         const isStaticAsset =
           url.pathname.endsWith(".js") ||
           url.pathname.endsWith(".css") ||
@@ -112,7 +105,6 @@ self.addEventListener("fetch", event => {
           url.pathname.endsWith(".json");
 
         if (cached && isStaticAsset) {
-          // Trả về cache ngay, cập nhật ngầm nếu có bản mới
           fetch(event.request)
             .then(networkRes => {
               if (networkRes && networkRes.status === 200) {
@@ -123,7 +115,6 @@ self.addEventListener("fetch", event => {
           return cached;
         }
 
-        // Với index.html: thử mạng trước (nhanh), fallback cache nếu mạng chậm/lỗi
         return fetch(event.request)
           .then(networkResponse => {
             if (networkResponse && networkResponse.status === 200) {
