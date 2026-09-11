@@ -1767,43 +1767,75 @@
       if (consecutiveTileErrors > 0) consecutiveTileErrors = Math.max(0, consecutiveTileErrors - 1);
     });
 
-    // Tự động nạp sẵn toàn bộ các mức Zoom (11 đến 16) quanh quán vào bộ nhớ máy (Pre-cache)
+    // Tự động tải trước toàn bộ vùng bán kính 30km từ quán (Load 1 lần nhớ mãi)
     function prefetchHalleMapTiles() {
       if (typeof window === "undefined") return;
-      const tilesToFetch = [];
+
       const lat = RESTAURANT.lat;
       const lng = RESTAURANT.lng;
+      const radiusKm = 30;
 
-      for (let z = 11; z <= 16; z++) {
-        const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
-        const cy = Math.floor(
-          ((1 -
-            Math.log(
-              Math.tan((lat * Math.PI) / 180) +
-                1 / Math.cos((lat * Math.PI) / 180)
-            ) /
-              Math.PI) /
-            2) *
-            Math.pow(2, z)
+      const dLat = radiusKm / 111.32;
+      const dLng = radiusKm / (111.32 * Math.cos((lat * Math.PI) / 180));
+
+      const minLat = lat - dLat;
+      const maxLat = lat + dLat;
+      const minLng = lng - dLng;
+      const maxLng = lng + dLng;
+
+      const tileUrls = [];
+
+      // Mức Zoom 11 -> 14 (Phủ kín 100% toàn bộ diện tích bán kính 30km)
+      for (let z = 11; z <= 14; z++) {
+        const minX = Math.floor(((minLng + 180) / 360) * Math.pow(2, z));
+        const maxX = Math.floor(((maxLng + 180) / 360) * Math.pow(2, z));
+        const minY = Math.floor(
+          ((1 - Math.log(Math.tan((maxLat * Math.PI) / 180) + 1 / Math.cos((maxLat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
+        );
+        const maxY = Math.floor(
+          ((1 - Math.log(Math.tan((minLat * Math.PI) / 180) + 1 / Math.cos((minLat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
         );
 
-        // Tạo lưới 3x3 quanh quán tại mỗi mức zoom (từ toàn cảnh đến chi tiết)
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dy = -1; dy <= 1; dy++) {
-            const x = cx + dx;
-            const y = cy + dy;
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
             const sub = ["mt0", "mt1", "mt2", "mt3"][(x + y) % 4];
-            tilesToFetch.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
+            tileUrls.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
           }
         }
       }
 
-      // Tải và lưu toàn bộ vào bộ nhớ đệm
-      tilesToFetch.forEach((tileUrl, index) => {
-        setTimeout(() => {
-          fetch(tileUrl, { mode: "no-cors" }).catch(() => {});
-        }, index * 35);
-      });
+      // Mức Zoom 15 & 16 (Tải chi tiết khu vực trọng tâm Halle)
+      for (let z = 15; z <= 16; z++) {
+        const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
+        const cy = Math.floor(
+          ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
+        );
+        const range = z === 15 ? 4 : 2;
+        for (let dx = -range; dx <= range; dx++) {
+          for (let dy = -range; dy <= range; dy++) {
+            const x = cx + dx;
+            const y = cy + dy;
+            const sub = ["mt0", "mt1", "mt2", "mt3"][(x + y) % 4];
+            tileUrls.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
+          }
+        }
+      }
+
+      // Tải ngầm theo từng đợt nhẹ nhàng
+      let index = 0;
+      function fetchNextBatch() {
+        if (index >= tileUrls.length) return;
+        const batch = tileUrls.slice(index, index + 3);
+        index += 3;
+        batch.forEach(url => fetch(url, { mode: "no-cors" }).catch(() => {}));
+        setTimeout(fetchNextBatch, 35);
+      }
+
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(fetchNextBatch, { timeout: 3000 });
+      } else {
+        setTimeout(fetchNextBatch, 2000);
+      }
     }
 
     // Watchdog: Kiểm tra sau 2.5s khởi động, nếu bản đồ chưa tải được mảnh nào thì ép tải lại ngay

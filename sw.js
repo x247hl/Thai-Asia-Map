@@ -1,6 +1,6 @@
 const CACHE_NAME = "thaiasia-map-v88";
 const TILES_CACHE_NAME = "thaiasia-tiles-v1";
-const MAX_CACHED_TILES = 2000;
+const MAX_CACHED_TILES = 10000;
 
 const APP_SHELL = [
   "./",
@@ -66,9 +66,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // 2. Mảnh bản đồ Google Maps (có/không traffic) / OSM / CartoDB
-  // Sử dụng Network-First khi có mạng (để luôn cập nhật tình trạng giao thông mới nhất)
-  // và tự động lưu vào CacheStorage để xem được Offline khi mất mạng / chế độ máy bay
+  // 2. Mảnh bản đồ Google Maps / OSM / CartoDB -> Chiến lược "Load 1 lần nhớ mãi"
+  // Đã tải 1 lần là lưu vĩnh viễn trên máy, mở lại nạp tức thì 0ms, không sợ mất mạng
   const isMapTile =
     url.hostname.includes("google.com") ||
     url.hostname.includes("tile.openstreetmap") ||
@@ -76,20 +75,23 @@ self.addEventListener("fetch", event => {
 
   if (isMapTile && (url.pathname.includes("/vt/") || url.pathname.endsWith(".png"))) {
     event.respondWith(
-      fetch(event.request)
-        .then(networkResponse => {
-          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === "opaque")) {
-            const copy = networkResponse.clone();
-            caches.open(TILES_CACHE_NAME).then(cache => {
+      caches.open(TILES_CACHE_NAME).then(async cache => {
+        const cachedResponse = await cache.match(event.request);
+
+        const fetchPromise = fetch(event.request)
+          .then(networkResponse => {
+            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === "opaque")) {
+              const copy = networkResponse.clone();
               cache.put(event.request, copy);
               limitCacheSize(TILES_CACHE_NAME, MAX_CACHED_TILES);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          return caches.open(TILES_CACHE_NAME).then(cache => cache.match(event.request));
-        })
+            }
+            return networkResponse;
+          })
+          .catch(() => cachedResponse);
+
+        // Nếu đã có sẵn trên máy -> trả về ngay 0ms, đồng thời chạy ngầm cập nhật
+        return cachedResponse || fetchPromise;
+      })
     );
     return;
   }
