@@ -1752,8 +1752,8 @@
         }, 1200);
       }
 
-      // Tự động chuyển nguồn dự phòng nếu Google Maps bị lỗi liên tiếp (> 6 tiles)
-      if (consecutiveTileErrors >= 6 && activeTileSource === "google") {
+      // Chỉ chuyển nguồn nếu đang online và Google Maps bị lỗi kéo dài (> 8 tiles)
+      if (consecutiveTileErrors >= 8 && activeTileSource === "google" && navigator.onLine) {
         console.warn("⚠️ Google Maps tile server bị lỗi/bóp băng thông, tự động chuyển sang CartoDB dự phòng...");
         activeTileSource = "carto";
         baseTileLayer.setUrl(TILE_SOURCES.carto.getUrl());
@@ -1767,35 +1767,43 @@
       if (consecutiveTileErrors > 0) consecutiveTileErrors = Math.max(0, consecutiveTileErrors - 1);
     });
 
-    // Tải sẵn các ô bản đồ trọng tâm Halle (Saale) vào bộ nhớ máy (Pre-cache)
+    // Tự động nạp sẵn toàn bộ các mức Zoom (11 đến 16) quanh quán vào bộ nhớ máy (Pre-cache)
     function prefetchHalleMapTiles() {
       if (typeof window === "undefined") return;
-      const coreHalleTiles = [
-        "https://mt0.google.com/vt/lyrs=m,traffic&x=1098&y=671&z=11",
-        "https://mt1.google.com/vt/lyrs=m,traffic&x=1099&y=671&z=11",
-        "https://mt0.google.com/vt/lyrs=m,traffic&x=2197&y=1342&z=12",
-        "https://mt1.google.com/vt/lyrs=m,traffic&x=2198&y=1342&z=12",
-        "https://mt2.google.com/vt/lyrs=m,traffic&x=2197&y=1343&z=12",
-        "https://mt3.google.com/vt/lyrs=m,traffic&x=2198&y=1343&z=12",
-        "https://mt0.google.com/vt/lyrs=m,traffic&x=4395&y=2685&z=13",
-        "https://mt1.google.com/vt/lyrs=m,traffic&x=4396&y=2685&z=13",
-        "https://mt2.google.com/vt/lyrs=m,traffic&x=4395&y=2686&z=13",
-        "https://mt3.google.com/vt/lyrs=m,traffic&x=4396&y=2686&z=13"
-      ];
+      const tilesToFetch = [];
+      const lat = RESTAURANT.lat;
+      const lng = RESTAURANT.lng;
 
-      const runPrefetch = () => {
-        coreHalleTiles.forEach((tileUrl, index) => {
-          setTimeout(() => {
-            fetch(tileUrl, { mode: "no-cors" }).catch(() => {});
-          }, index * 80);
-        });
-      };
+      for (let z = 11; z <= 16; z++) {
+        const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
+        const cy = Math.floor(
+          ((1 -
+            Math.log(
+              Math.tan((lat * Math.PI) / 180) +
+                1 / Math.cos((lat * Math.PI) / 180)
+            ) /
+              Math.PI) /
+            2) *
+            Math.pow(2, z)
+        );
 
-      if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(runPrefetch, { timeout: 3000 });
-      } else {
-        setTimeout(runPrefetch, 2500);
+        // Tạo lưới 3x3 quanh quán tại mỗi mức zoom (từ toàn cảnh đến chi tiết)
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const x = cx + dx;
+            const y = cy + dy;
+            const sub = ["mt0", "mt1", "mt2", "mt3"][(x + y) % 4];
+            tilesToFetch.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
+          }
+        }
       }
+
+      // Tải và lưu toàn bộ vào bộ nhớ đệm
+      tilesToFetch.forEach((tileUrl, index) => {
+        setTimeout(() => {
+          fetch(tileUrl, { mode: "no-cors" }).catch(() => {});
+        }, index * 35);
+      });
     }
 
     // Watchdog: Kiểm tra sau 2.5s khởi động, nếu bản đồ chưa tải được mảnh nào thì ép tải lại ngay
