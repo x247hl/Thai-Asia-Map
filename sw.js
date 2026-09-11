@@ -59,7 +59,7 @@ async function limitCacheSize(cacheName, maxItems) {
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
-  const url = new URL(event.request.url);
+  const fullUrl = event.request.url;
 
   // 1. Tuyệt đối không cache API để trạng thái đơn/shipper luôn lấy dữ liệu mới nhất
   if (url.hostname === "api.thaiasiasushibar.de") {
@@ -67,14 +67,13 @@ self.addEventListener("fetch", event => {
   }
 
   // 2. Không cache lớp giao thông trực tiếp (traffic overlay) vì thay đổi từng phút
-  const lyrs = url.searchParams.get("lyrs");
-  if (lyrs === "traffic" || lyrs === "h,traffic") {
+  if (fullUrl.includes("lyrs=traffic") || fullUrl.includes("lyrs=h,traffic")) {
     return;
   }
 
   // 3. Cache-First cho các mảnh bản đồ nền tĩnh (Google Maps base 'lyrs=m', OSM, CartoDB)
   const isBaseTile =
-    (url.hostname.includes("google.com") && lyrs === "m") ||
+    (url.hostname.includes("google.com") && fullUrl.includes("lyrs=m")) ||
     url.hostname.includes("tile.openstreetmap.org") ||
     url.hostname.includes("tile.openstreetmap.de") ||
     url.hostname.includes("cartocdn.com");
@@ -88,7 +87,7 @@ self.addEventListener("fetch", event => {
         }
         try {
           const networkResponse = await fetch(event.request);
-          if (networkResponse && networkResponse.status === 200) {
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === "opaque")) {
             cache.put(event.request, networkResponse.clone());
             limitCacheSize(TILES_CACHE_NAME, MAX_CACHED_TILES);
           }
