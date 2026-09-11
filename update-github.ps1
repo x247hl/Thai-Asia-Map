@@ -19,6 +19,13 @@ $targetFiles = @(
   "icon-512.png",
   "shipper-car-top.png",
   "shipper-car-side.png",
+  "leaflet/leaflet.js",
+  "leaflet/leaflet.css",
+  "leaflet/images/marker-icon.png",
+  "leaflet/images/marker-icon-2x.png",
+  "leaflet/images/marker-shadow.png",
+  "leaflet/images/layers.png",
+  "leaflet/images/layers-2x.png",
   "Update-GitHub.bat",
   "update-github.ps1"
 )

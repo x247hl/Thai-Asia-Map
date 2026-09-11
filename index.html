@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="./leaflet/leaflet.css" />
 
   <style>
     html {
@@ -1573,11 +1573,16 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v87</span>
+      <span style="font-weight: 700; color: #7c3aed;">v88</span>
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="./leaflet/leaflet.js"></script>
+  <script>
+    if (typeof L === "undefined") {
+      document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');
+    }
+  </script>
 
   <script>
     const API_BASE = "https://api.thaiasiasushibar.de/api";
@@ -1629,7 +1634,9 @@
     // Mỗi lần mở trang, map luôn bắt đầu tại quán.
     // Dữ liệu đơn/shipper tải xong sẽ KHÔNG tự kéo map sang chỗ khác.
     const map = L.map("map", {
-      zoomControl: false
+      zoomControl: false,
+      fadeAnimation: true,
+      zoomAnimation: true
     }).setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
 
     function setExactMapDimensions() {
@@ -1641,16 +1648,13 @@
         mapEl.style.height = h + "px";
       }
       if (map) {
-        map.invalidateSize({ debounceMoveend: true });
+        map.invalidateSize({ pan: false, debounceMoveend: true });
       }
     }
 
     window.addEventListener("resize", setExactMapDimensions);
     window.addEventListener("orientationchange", () => {
-      setTimeout(setExactMapDimensions, 60);
-      setTimeout(setExactMapDimensions, 200);
-      setTimeout(setExactMapDimensions, 500);
-      setTimeout(setExactMapDimensions, 900);
+      [50, 150, 300, 600, 1000].forEach(ms => setTimeout(setExactMapDimensions, ms));
     });
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", setExactMapDimensions);
@@ -1658,6 +1662,7 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         setTimeout(setExactMapDimensions, 50);
+        setTimeout(setExactMapDimensions, 300);
       }
     });
 
@@ -1671,30 +1676,163 @@
       } catch (e) { }
     }
 
-    setTimeout(setExactMapDimensions, 50);
-    setTimeout(setExactMapDimensions, 250);
-    setTimeout(setExactMapDimensions, 600);
+    [50, 150, 300, 600, 1200, 2500].forEach(ms => setTimeout(setExactMapDimensions, ms));
 
     function resetMapToRestaurant() {
       stopFollowShipper();
       map.setView([RESTAURANT.lat, RESTAURANT.lng], getDefaultZoom());
     }
 
-    function getGoogleMapTileUrl(withTraffic) {
-      const lyr = withTraffic ? "m,traffic" : "m";
-      const scale = (typeof window !== "undefined" && window.devicePixelRatio && window.devicePixelRatio >= 1.5) ? 2 : 1;
-      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}&scale=${scale}`;
-    }
+    // Nguồn bản đồ nền tĩnh & Nguồn dự phòng (Fallback)
+    const TILE_SOURCES = {
+      google: {
+        url: "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        subdomains: ["mt0", "mt1", "mt2", "mt3"],
+        maxZoom: 20
+      },
+      carto: {
+        url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        subdomains: ["a", "b", "c", "d"],
+        maxZoom: 19
+      },
+      osm: {
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        subdomains: ["a", "b", "c"],
+        maxZoom: 19
+      }
+    };
 
-    const isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
+    let activeTileSource = "google";
+    let consecutiveTileErrors = 0;
+    let totalBaseTilesLoaded = 0;
+    let isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
 
-    const baseTileLayer = L.tileLayer(getGoogleMapTileUrl(isTrafficEnabled), {
+    // 1. Nền bản đồ tĩnh (Base Map Layer) - Lưu đệm Cache-First trong Service Worker (0ms, không phụ thuộc mạng)
+    const baseTileLayer = L.tileLayer(TILE_SOURCES.google.url, {
+      maxZoom: 20,
+      subdomains: TILE_SOURCES.google.subdomains,
+      tileSize: 256,
+      updateWhenZooming: false,
+      updateWhenIdle: true,
+      keepBuffer: 3,
+      crossOrigin: true
+    }).addTo(map);
+
+    // 2. Lớp giao thông trực tiếp (Traffic Overlay Layer) - Trong suốt, tải đè lên nền tĩnh
+    const trafficTileLayer = L.tileLayer("https://{s}.google.com/vt/lyrs=traffic&x={x}&y={y}&z={z}", {
       maxZoom: 20,
       subdomains: ["mt0", "mt1", "mt2", "mt3"],
       tileSize: 256,
-      updateWhenZooming: true,
-      updateWhenIdle: false
-    }).addTo(map);
+      opacity: 0.9,
+      updateWhenZooming: false,
+      updateWhenIdle: true,
+      crossOrigin: true
+    });
+
+    if (isTrafficEnabled) {
+      trafficTileLayer.addTo(map);
+    }
+
+    // Tự động thử lại khi 1 mảnh tile bị lỗi mạng (Retry)
+    baseTileLayer.on("tileerror", function (event) {
+      consecutiveTileErrors++;
+      const tile = event.tile;
+      const originalSrc = event.url || (tile && tile.src);
+
+      if (tile && !tile._retryAttempt) {
+        tile._retryAttempt = 1;
+        setTimeout(() => {
+          if (tile && tile.parentElement) {
+            const subs = ["mt1", "mt2", "mt3", "mt0"];
+            const nextSub = subs[Math.floor(Math.random() * subs.length)];
+            let retrySrc = originalSrc.replace(/mt[0-3]/, nextSub);
+            if (!retrySrc.includes("_retry=")) {
+              retrySrc += (retrySrc.includes("?") ? "&" : "?") + "_retry=" + Date.now();
+            }
+            tile.src = retrySrc;
+          }
+        }, 500);
+      } else if (tile && tile._retryAttempt < 2) {
+        tile._retryAttempt++;
+        setTimeout(() => {
+          if (tile && tile.parentElement) {
+            tile.src = originalSrc.replace(/_retry=\d+/, "_retry=" + Date.now());
+          }
+        }, 1200);
+      }
+
+      // Tự động chuyển nguồn dự phòng nếu Google Maps bị lỗi liên tiếp (> 6 tiles)
+      if (consecutiveTileErrors >= 6 && activeTileSource === "google") {
+        console.warn("⚠️ Google Maps tile server bị lỗi/bóp băng thông, tự động chuyển sang CartoDB dự phòng...");
+        activeTileSource = "carto";
+        baseTileLayer.setUrl(TILE_SOURCES.carto.url);
+        baseTileLayer.options.subdomains = TILE_SOURCES.carto.subdomains;
+        baseTileLayer.redraw();
+      }
+    });
+
+    baseTileLayer.on("tileload", function () {
+      totalBaseTilesLoaded++;
+      if (consecutiveTileErrors > 0) consecutiveTileErrors = Math.max(0, consecutiveTileErrors - 1);
+    });
+
+    trafficTileLayer.on("tileerror", function (event) {
+      const tile = event.tile;
+      if (tile && !tile._trafficRetry) {
+        tile._trafficRetry = 1;
+        setTimeout(() => {
+          if (tile && tile.parentElement) {
+            tile.src = event.url;
+          }
+        }, 1000);
+      }
+    });
+
+    // Tải sẵn các ô bản đồ trọng tâm Halle (Saale) vào bộ nhớ máy (Pre-cache)
+    function prefetchHalleMapTiles() {
+      if (typeof window === "undefined" || !("caches" in window)) return;
+      const coreHalleTiles = [
+        "https://mt0.google.com/vt/lyrs=m&x=1098&y=671&z=11",
+        "https://mt1.google.com/vt/lyrs=m&x=1099&y=671&z=11",
+        "https://mt0.google.com/vt/lyrs=m&x=2197&y=1342&z=12",
+        "https://mt1.google.com/vt/lyrs=m&x=2198&y=1342&z=12",
+        "https://mt2.google.com/vt/lyrs=m&x=2197&y=1343&z=12",
+        "https://mt3.google.com/vt/lyrs=m&x=2198&y=1343&z=12",
+        "https://mt0.google.com/vt/lyrs=m&x=4395&y=2685&z=13",
+        "https://mt1.google.com/vt/lyrs=m&x=4396&y=2685&z=13",
+        "https://mt2.google.com/vt/lyrs=m&x=4395&y=2686&z=13",
+        "https://mt3.google.com/vt/lyrs=m&x=4396&y=2686&z=13"
+      ];
+
+      const runPrefetch = () => {
+        coreHalleTiles.forEach((tileUrl, index) => {
+          setTimeout(() => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = tileUrl;
+          }, index * 100);
+        });
+      };
+
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(runPrefetch, { timeout: 3000 });
+      } else {
+        setTimeout(runPrefetch, 2500);
+      }
+    }
+
+    // Watchdog: Kiểm tra sau 2.5s khởi động, nếu bản đồ chưa tải được mảnh nào thì ép tải lại ngay
+    setTimeout(() => {
+      if (totalBaseTilesLoaded === 0) {
+        console.warn("⚠️ Watchdog: Chưa có tile nào sau 2.5s, tự động kích hoạt tải lại...");
+        setExactMapDimensions();
+        baseTileLayer.redraw();
+        if (isTrafficEnabled && map.hasLayer(trafficTileLayer)) {
+          trafficTileLayer.redraw();
+        }
+      }
+      prefetchHalleMapTiles();
+    }, 2500);
 
     const orderLayer = L.layerGroup().addTo(map);
     const shipperLayer = L.layerGroup().addTo(map);
@@ -2138,10 +2276,21 @@
 
     els.showTraffic.addEventListener("change", () => {
       const enabled = els.showTraffic.checked;
-      baseTileLayer.setUrl(getGoogleMapTileUrl(enabled));
+      isTrafficEnabled = enabled;
       try {
         localStorage.setItem("thaiasia.showTraffic", enabled ? "1" : "0");
       } catch (err) { }
+
+      if (enabled) {
+        if (!map.hasLayer(trafficTileLayer)) {
+          trafficTileLayer.addTo(map);
+        }
+        trafficTileLayer.redraw();
+      } else {
+        if (map.hasLayer(trafficTileLayer)) {
+          map.removeLayer(trafficTileLayer);
+        }
+      }
     });
 
     function escapeHtml(value) {
@@ -2684,6 +2833,9 @@
       orderLayer.clearLayers();
       openedOrderKey = prevOpenedKey;
       lastOrders = Array.isArray(orders) ? orders : [];
+      if (map) {
+        map.invalidateSize({ pan: false });
+      }
 
       const points = [];
       let markerToReopen = null;
@@ -5433,6 +5585,7 @@
       }
     }
 
+    let trafficTimer = null;
     function startPolling(options = {}) {
       stopPolling();
       if (options.resetView) {
@@ -5442,12 +5595,24 @@
       refreshTimer = setInterval(() => {
         refreshAll(false);
       }, REFRESH_MS);
+
+      if (!trafficTimer) {
+        trafficTimer = setInterval(() => {
+          if (!document.hidden && isTrafficEnabled && map && map.hasLayer(trafficTileLayer)) {
+            trafficTileLayer.redraw();
+          }
+        }, 120000);
+      }
     }
 
     function stopPolling() {
       if (refreshTimer) {
         clearInterval(refreshTimer);
         refreshTimer = null;
+      }
+      if (trafficTimer) {
+        clearInterval(trafficTimer);
+        trafficTimer = null;
       }
     }
 
