@@ -1687,13 +1687,13 @@
 
     function getGoogleMapTileUrl(withTraffic) {
       const lyr = withTraffic ? "m,traffic" : "m";
-      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}`;
+      return `https://{s}.google.com/vt/lyrs=${lyr}&x={x}&y={y}&z={z}&scale=2`;
     }
 
     let totalBaseTilesLoaded = 0;
     let isTrafficEnabled = localStorage.getItem("thaiasia.showTraffic") !== "0";
 
-    // Nền bản đồ chính: 100% Google Maps (hỗ trợ hiển thị giao thông và lưu đệm Cache vĩnh viễn)
+    // Nền bản đồ chính: 100% Google Maps (hỗ trợ hiển thị giao thông và lưu đệm Cache vĩnh viễn, chuẩn Retina 512px siêu nét)
     const baseTileLayer = L.tileLayer(getGoogleMapTileUrl(isTrafficEnabled), {
       maxZoom: 20,
       subdomains: ["mt0", "mt1", "mt2", "mt3"],
@@ -1741,7 +1741,7 @@
             const x = cx + dx;
             const y = cy + dy;
             const sub = ["mt0", "mt1", "mt2", "mt3"][(x + y) % 4];
-            tileUrls.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}`);
+            tileUrls.push(`https://${sub}.google.com/vt/lyrs=m,traffic&x=${x}&y=${y}&z=${z}&scale=2`);
           }
         }
       });

@@ -1,4 +1,4 @@
-const CACHE_NAME = "thaiasia-map-v89";
+const CACHE_NAME = "thaiasia-map-v90";
 const TILES_CACHE_NAME = "thaiasia-tiles-v1";
 const MAX_CACHED_TILES = 10000;
 
