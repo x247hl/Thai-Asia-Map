@@ -1735,20 +1735,21 @@
       totalBaseTilesLoaded++;
     });
 
-    // Tự động nạp sẵn các mức Zoom chính (11 đến 16) khu vực Halle quanh quán vào máy
+    // Tự động nạp sẵn các mức Zoom từ 11 đến 16 phủ kín toàn bộ thành phố Halle vào máy (Load 1 lần nhớ mãi)
     function prefetchHalleMapTiles() {
       if (typeof window === "undefined") return;
 
       const lat = RESTAURANT.lat;
       const lng = RESTAURANT.lng;
       const tileUrls = [];
+      const ranges = { 11: 2, 12: 3, 13: 4, 14: 6, 15: 9, 16: 15 };
 
       for (let z = 11; z <= 16; z++) {
         const cx = Math.floor(((lng + 180) / 360) * Math.pow(2, z));
         const cy = Math.floor(
           ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, z)
         );
-        const range = (z === 11 || z === 12) ? 2 : 1; // Lưới 5x5 ở Z11-Z12, 3x3 ở Z13-Z16
+        const range = ranges[z] || 2;
         for (let dx = -range; dx <= range; dx++) {
           for (let dy = -range; dy <= range; dy++) {
             const x = cx + dx;
@@ -1759,19 +1760,20 @@
         }
       }
 
-      // Nạp ngầm nhẹ nhàng từng ô cách nhau 80ms để không bị Google bóp băng thông
+      // Tải ngầm 4 ô mỗi đợt cách nhau 30ms (tổng cộng ~12-15s là nạp xong trọn vẹn toàn bộ Halle từ Z11 đến Z16)
       let index = 0;
       function fetchNextBatch() {
         if (index >= tileUrls.length) return;
-        const url = tileUrls[index++];
-        fetch(url, { mode: "no-cors" }).catch(() => {});
-        setTimeout(fetchNextBatch, 80);
+        const batch = tileUrls.slice(index, index + 4);
+        index += 4;
+        batch.forEach(url => fetch(url, { mode: "no-cors" }).catch(() => {}));
+        setTimeout(fetchNextBatch, 30);
       }
 
       if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(fetchNextBatch, { timeout: 3000 });
+        window.requestIdleCallback(fetchNextBatch, { timeout: 2500 });
       } else {
-        setTimeout(fetchNextBatch, 2000);
+        setTimeout(fetchNextBatch, 1500);
       }
     }
 
