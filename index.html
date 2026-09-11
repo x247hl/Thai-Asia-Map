@@ -567,21 +567,23 @@
     .shipper-car-marker {
       width: 16px;
       height: 32px;
-      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
+      background: transparent !important;
+      border: none !important;
     }
 
     .shipper-car-body {
       width: 16px;
       height: 32px;
-      transform-origin: center center;
+      transform-origin: 50% 50%;
+      -webkit-transform-origin: 50% 50%;
       transition: transform .6s cubic-bezier(0.25, 1, 0.5, 1);
       display: flex;
       align-items: center;
       justify-content: center;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .4));
+      filter: drop-shadow(0 0 2.5px rgba(0, 0, 0, .55));
     }
 
     .shipper-car-img {
