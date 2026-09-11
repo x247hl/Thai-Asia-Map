@@ -2261,6 +2261,7 @@
 
     const googleGeocodeMemCache = new Map();
     const googleGeocodeInFlight = new Map();
+    let googleGeocodeSuspendedUntil = 0; // Tự động ngắt Google GPS khi hết lượt và tự khôi phục
 
     function normalizeAddressForGeocode(addr) {
       return String(addr || "")
@@ -2297,6 +2298,11 @@
         }
       } catch (e) { }
 
+      // Nếu đang trong thời gian tạm ngắt Google GPS do hết lượt -> dùng ngay tọa độ gốc của server
+      if (Date.now() < googleGeocodeSuspendedUntil) {
+        return null;
+      }
+
       // 3. Chống gọi trùng khi nhiều đơn cùng địa chỉ đang tải đồng thời
       if (googleGeocodeInFlight.has(normKey)) {
         return googleGeocodeInFlight.get(normKey);
@@ -2316,8 +2322,21 @@
 
           const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryAddr)}&key=${apiKey}&language=vi`;
           const res = await fetch(url);
+          if (res.status === 429 || res.status === 403) {
+            // Hết hạn mức hoặc bị giới hạn -> Tự động tắt Google GPS 15 phút, chuyển về tọa độ cũ
+            googleGeocodeSuspendedUntil = Date.now() + 15 * 60 * 1000;
+            console.warn("⚠️ [Google GPS] Đã chạm hạn mức Google (HTTP " + res.status + "). Tự động tắt Google GPS và dùng tọa độ cũ, tự khôi phục sau 15 phút.");
+            return null;
+          }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
+
+          if (data && (data.status === "OVER_QUERY_LIMIT" || data.status === "RESOURCE_EXHAUSTED" || data.status === "REQUEST_DENIED")) {
+            // Google báo hết quota -> Tự động tắt Google GPS 15 phút, chuyển về dùng như cũ
+            googleGeocodeSuspendedUntil = Date.now() + 15 * 60 * 1000;
+            console.warn(`⚠️ [Google GPS] Quota Google tạm hết (${data.status}). Tự động tắt Google GPS và dùng tọa độ cũ, tự khôi phục sau 15 phút.`);
+            return null;
+          }
 
           if (data && data.status === "OK" && Array.isArray(data.results) && data.results.length > 0) {
             const loc = data.results[0].geometry?.location;
@@ -2336,7 +2355,18 @@
               return result;
             }
           }
-          return null;
+          // Nếu địa chỉ không tìm thấy trên Google, lưu cache fallback để không gọi lại lặp đi lặp lại
+          const fallbackResult = {
+            lat: toNumber(order.latitude),
+            lng: toNumber(order.longitude),
+            locationType: "APPROXIMATE",
+            source: "backend_fallback"
+          };
+          googleGeocodeMemCache.set(normKey, fallbackResult);
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(fallbackResult));
+          } catch (e) { }
+          return fallbackResult;
         } catch (err) {
           console.warn("Geocoding Google failed:", rawAddress, err);
           return null;
@@ -2389,7 +2419,7 @@
             const rawLat = toNumber(order.latitude);
             const rawLng = toNumber(order.longitude);
             const geo = await geocodeOrderAddress(order);
-            if (geo && typeof geo.lat === "number" && typeof geo.lng === "number") {
+            if (geo && typeof geo.lat === "number" && typeof geo.lng === "number" && geo.source === "google") {
               const diffLat = rawLat !== null ? Math.abs(rawLat - geo.lat) : 1;
               const diffLng = rawLng !== null ? Math.abs(rawLng - geo.lng) : 1;
               const isFixed = diffLat > 0.0001 || diffLng > 0.0001;
@@ -2403,6 +2433,8 @@
               if (isFixed) {
                 console.log(`📍 [Google GPS] Đã định vị chuẩn số nhà đơn #${order.code} (${formatOrderAddress(order)}): lệch cũ ~${Math.round(Math.max(diffLat, diffLng) * 111000)}m -> Tọa độ mới Google: [${geo.lat}, ${geo.lng}]`);
               }
+            } else {
+              order._googleGeocoded = false;
             }
           } catch (e) { }
         })
