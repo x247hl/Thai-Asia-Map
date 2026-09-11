@@ -654,6 +654,20 @@
       margin-bottom: 0;
     }
 
+    .google-geo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #059669;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 1px 6px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
     .order-popup-time {
       font-size: 12px;
       color: #555;
@@ -1559,7 +1573,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v86</span>
+      <span style="font-weight: 700; color: #7c3aed;">v87</span>
     </div>
   </div>
 
@@ -2245,6 +2259,96 @@
       }
     }
 
+    const googleGeocodeMemCache = new Map();
+    const googleGeocodeInFlight = new Map();
+
+    function normalizeAddressForGeocode(addr) {
+      return String(addr || "")
+        .toLowerCase()
+        .replace(/[,\.\-\/]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    async function geocodeOrderAddress(order) {
+      const rawAddress = formatOrderAddress(order);
+      if (!rawAddress || rawAddress.trim().length < 3) {
+        return null;
+      }
+
+      const normKey = normalizeAddressForGeocode(rawAddress);
+      if (!normKey) return null;
+
+      // 1. Kiểm tra RAM Cache (cực nhanh, 0ms)
+      if (googleGeocodeMemCache.has(normKey)) {
+        return googleGeocodeMemCache.get(normKey);
+      }
+
+      // 2. Kiểm tra LocalStorage (Lưu vĩnh viễn trên máy, 0 tốn request)
+      const storageKey = `thaiasia.geo.${normKey}`;
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+            googleGeocodeMemCache.set(normKey, parsed);
+            return parsed;
+          }
+        }
+      } catch (e) { }
+
+      // 3. Chống gọi trùng khi nhiều đơn cùng địa chỉ đang tải đồng thời
+      if (googleGeocodeInFlight.has(normKey)) {
+        return googleGeocodeInFlight.get(normKey);
+      }
+
+      const apiKey = (googleRoutesApiKey || "").trim();
+      if (!apiKey || apiKey.length < 10) {
+        return null;
+      }
+
+      // 4. Gọi Google Geocoding API đúng 1 lần duy nhất cho địa chỉ mới
+      const promise = (async () => {
+        try {
+          const queryAddr = rawAddress.includes("Halle") || rawAddress.includes("061")
+            ? `${rawAddress}, Germany`
+            : `${rawAddress}, Halle (Saale), Germany`;
+
+          const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryAddr)}&key=${apiKey}&language=vi`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          if (data && data.status === "OK" && Array.isArray(data.results) && data.results.length > 0) {
+            const loc = data.results[0].geometry?.location;
+            if (loc && typeof loc.lat === "number" && typeof loc.lng === "number") {
+              const result = {
+                lat: loc.lat,
+                lng: loc.lng,
+                formattedAddress: data.results[0].formatted_address || rawAddress,
+                locationType: data.results[0].geometry?.location_type || "ROOFTOP",
+                source: "google"
+              };
+              googleGeocodeMemCache.set(normKey, result);
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(result));
+              } catch (e) { }
+              return result;
+            }
+          }
+          return null;
+        } catch (err) {
+          console.warn("Geocoding Google failed:", rawAddress, err);
+          return null;
+        } finally {
+          googleGeocodeInFlight.delete(normKey);
+        }
+      })();
+
+      googleGeocodeInFlight.set(normKey, promise);
+      return promise;
+    }
+
     async function loadOrders() {
       await loadProductCatalog();
       const selected = els.statusFilter.value;
@@ -2277,6 +2381,32 @@
 
       // Mặc định trên bản đồ luôn chỉ hiện đơn giao hàng
       orders = orders.filter(order => order.shipping_method === "home_delivery");
+
+      // Tự động chuẩn hóa & sửa tọa độ chính xác từng số nhà bằng Google Geocoding
+      await Promise.all(
+        orders.map(async order => {
+          try {
+            const rawLat = toNumber(order.latitude);
+            const rawLng = toNumber(order.longitude);
+            const geo = await geocodeOrderAddress(order);
+            if (geo && typeof geo.lat === "number" && typeof geo.lng === "number") {
+              const diffLat = rawLat !== null ? Math.abs(rawLat - geo.lat) : 1;
+              const diffLng = rawLng !== null ? Math.abs(rawLng - geo.lng) : 1;
+              const isFixed = diffLat > 0.0001 || diffLng > 0.0001;
+
+              order.latitude = geo.lat;
+              order.longitude = geo.lng;
+              order._googleGeocoded = true;
+              order._geoAccuracy = geo.locationType || "ROOFTOP";
+              order._geoFixed = isFixed;
+
+              if (isFixed) {
+                console.log(`📍 [Google GPS] Đã định vị chuẩn số nhà đơn #${order.code} (${formatOrderAddress(order)}): lệch cũ ~${Math.round(Math.max(diffLat, diffLng) * 111000)}m -> Tọa độ mới Google: [${geo.lat}, ${geo.lng}]`);
+              }
+            }
+          } catch (e) { }
+        })
+      );
 
       renderOrders(orders);
       return orders;
@@ -2568,6 +2698,7 @@
           <div class="order-popup">
             <div class="order-popup-header">
               <span class="popup-title">Đơn #${escapeHtml(code)}</span>
+              ${order._googleGeocoded ? `<span class="google-geo-badge" title="Tọa độ chính xác theo Google Maps (${escapeHtml(order._geoAccuracy || "ROOFTOP")})">📍 Google GPS</span>` : ""}
               ${order.created_at ? `<span class="order-popup-time">${escapeHtml(formatOrderDateTime(order.created_at))}</span>` : ""}
             </div>
             <div class="popup-line"><b>${escapeHtml(orderStatusText(status, order.status_title))}</b></div>
