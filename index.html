@@ -1559,7 +1559,7 @@
 
     <div class="update-row" style="margin-top: 6px; border-top: 1px dashed #eee; padding-top: 8px;">
       <span>Phiên bản</span>
-      <span style="font-weight: 700; color: #7c3aed;">v85</span>
+      <span style="font-weight: 700; color: #7c3aed;">v86</span>
     </div>
   </div>
 
@@ -4676,10 +4676,13 @@
 
     const shipperMarkers = new Map();
     let activeFollowShipperKey = null;
+    let isFollowShipperPopupOpen = false;
+    let isRefreshingShippers = false;
 
     function stopFollowShipper() {
       if (activeFollowShipperKey) {
         activeFollowShipperKey = null;
+        isFollowShipperPopupOpen = false;
         updateFollowUi();
       }
     }
@@ -4727,12 +4730,14 @@
       // Nếu bấm lại vào chính shipper đang bám đuôi -> hủy bám đuôi
       if (activeFollowShipperKey === key) {
         activeFollowShipperKey = null;
+        isFollowShipperPopupOpen = false;
         updateFollowUi();
         return;
       }
 
       // Kích hoạt chế độ bám đuôi theo xe này
       activeFollowShipperKey = key;
+      isFollowShipperPopupOpen = true;
 
       let targetLat = toNumber(shipper.latitude ?? shipper.lat);
       let targetLng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
@@ -5072,6 +5077,7 @@
     }
 
     function renderShippers(shippers) {
+      isRefreshingShippers = true;
       shipperLayer.clearLayers();
       shipperMarkers.clear();
 
@@ -5082,6 +5088,7 @@
         const lng = toNumber(shipper.longitude ?? shipper.lng ?? shipper.lon);
         if (lat === null || lng === null) return;
 
+        const key = getShipperKey(shipper);
         const name = shipper?.user?.name || shipper?.name || "Shipper";
         const online = shipper?.is_online === true;
         const bearing = getShipperBearing(shipper, lat, lng);
@@ -5127,7 +5134,9 @@
           .addTo(shipperLayer);
 
         marker.on("click", () => {
-          const key = getShipperKey(shipper);
+          if (activeFollowShipperKey === key) {
+            isFollowShipperPopupOpen = true;
+          }
           const shipperName = shipper?.user?.name || shipper?.name || "Shipper";
 
           if (lastInteractedOrderKey && !routeOrderKeys.includes(lastInteractedOrderKey)) {
@@ -5151,19 +5160,35 @@
           }
         });
 
-        shipperMarkers.set(getShipperKey(shipper), marker);
+        marker.on("popupopen", () => {
+          if (activeFollowShipperKey === key) {
+            isFollowShipperPopupOpen = true;
+          }
+        });
+
+        marker.on("popupclose", () => {
+          if (!isRefreshingShippers && activeFollowShipperKey === key) {
+            isFollowShipperPopupOpen = false;
+          }
+        });
+
+        shipperMarkers.set(key, marker);
       });
 
-      // Nếu đang bật chế độ bám đuôi, tự động cuộn bản đồ theo vị trí mới nhất của xe và giữ mở bảng thông tin
+      // Nếu đang bật chế độ bám đuôi, tự động cuộn bản đồ theo vị trí mới nhất của xe
       if (activeFollowShipperKey) {
         const activeMarker = shipperMarkers.get(activeFollowShipperKey);
         if (activeMarker) {
           const latLng = activeMarker.getLatLng();
           map.panTo(latLng, { animate: true, duration: 1 });
-          activeMarker.openPopup();
+          // Chỉ mở lại popup nếu trước đó người dùng chưa bấm đóng X
+          if (isFollowShipperPopupOpen) {
+            activeMarker.openPopup();
+          }
         }
       }
 
+      isRefreshingShippers = false;
       updateFollowUi();
     }
 
