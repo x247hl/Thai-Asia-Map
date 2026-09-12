@@ -2424,17 +2424,22 @@
     const OSM_GEOCODE_CENTER_LON = 11.9961;
     const OSM_GEOCODE_BBOX_20KM = "11.70,51.28,12.29,51.65";
 
-    function normalizeAddressForGeocode(addr) {
-      return String(addr || "")
+    // Danh sách các thôn/xã/quận đặc thù quanh khu vực Halle & Landsberg
+    const KNOWN_DISTRICTS_REGEX = /(?:Zwebendorf|Reußen|Reussen|Oppin|Untermaschwitz|Obermaschwitz|Maschwitz|Braschwitz|Peißen|Peissen|Niemberg|Queis|Gütz|Guetz|Spickendorf|Lohnsdorf|Plößnitz|Ploessnitz|Dautzsch|Büschdorf|Bueschdorf|Kanena|Bruckdorf|Reideburg|Diemitz|Klepzig|Hohenthurm|Zwintschöna|Dieskau|Gröbers|Schkeuditz|Teutschenthal|Salzmünde|Merseburg)/i;
+
+    function extractDistrictHint(order) {
+      if (!order) return "";
+      const text = `${order.city || ""} ${order.apartment_number || ""} ${order.house_number || ""} ${order.note || ""}`;
+      const match = text.match(KNOWN_DISTRICTS_REGEX);
+      return match ? match[0] : "";
+    }
+
+    function normalizeAddressForGeocode(addr, districtHint = "") {
+      return `${String(addr || "")} ${districtHint}`
         .toLowerCase()
         .replace(/[,\.\-\/]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-    }
-
-    function canRequestGoogleGeocodeForOrder(order) {
-      const status = String(order?.status || "").toLowerCase();
-      return status !== "complete" && status !== "cancel";
     }
 
     async function geocodeOrderAddress(order) {
@@ -2443,7 +2448,8 @@
         return null;
       }
 
-      const normKey = normalizeAddressForGeocode(rawAddress);
+      const districtHint = extractDistrictHint(order);
+      const normKey = normalizeAddressForGeocode(rawAddress, districtHint);
       if (!normKey) return null;
 
       // 1. Kiểm tra RAM Cache (0ms)
@@ -2451,8 +2457,8 @@
         return googleGeocodeMemCache.get(normKey);
       }
 
-      // 2. Kiểm tra LocalStorage (Lưu vĩnh viễn trên máy, 0 tốn request)
-      const storageKey = `thaiasia.geo.${normKey}`;
+      // 2. Kiểm tra LocalStorage v3 (Lưu vĩnh viễn trên máy, tự động bỏ cache sai cũ)
+      const storageKey = `thaiasia.geo.v3.${normKey}`;
       try {
         const saved = localStorage.getItem(storageKey);
         if (saved) {
@@ -2469,10 +2475,6 @@
         return googleGeocodeInFlight.get(normKey);
       }
 
-      if (!canRequestGoogleGeocodeForOrder(order)) {
-        return null;
-      }
-
       const street = String(order.address || "").trim();
       const houseNum = String(order.apartment_number || order.house_number || "").trim();
       const postcode = String(order.postcode || "").trim();
@@ -2483,7 +2485,7 @@
           // --- BƯỚC 1: Tìm kiếm chính xác với OpenStreetMap Photon (Khóa phạm vi 20km quanh quán) ---
           // Tự động phân biệt chính xác từng làng (Zwebendorf vs Maschwitz, Reußen, Oppin,...)
           try {
-            const photonQuery = [street, houseNum, postcode, city].filter(Boolean).join(" ");
+            const photonQuery = [street, houseNum, postcode, city, districtHint].filter(Boolean).join(" ");
             const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
               photonQuery
             )}&lat=${OSM_GEOCODE_CENTER_LAT}&lon=${OSM_GEOCODE_CENTER_LON}&bbox=${OSM_GEOCODE_BBOX_20KM}&limit=3`;
@@ -2504,7 +2506,7 @@
                     lng: coords[0],
                     formattedAddress: `${chosen.properties?.street || street} ${chosen.properties?.housenumber || houseNum}, ${chosen.properties?.postcode || postcode} ${chosen.properties?.city || city}`,
                     locationType: chosen.properties?.housenumber ? "ROOFTOP" : "RANGE_INTERPOLATED",
-                    district: chosen.properties?.district || chosen.properties?.suburb || "",
+                    district: chosen.properties?.district || chosen.properties?.suburb || districtHint || "",
                     source: "osm_photon"
                   };
                   googleGeocodeMemCache.set(normKey, result);
@@ -2521,11 +2523,14 @@
 
           // --- BƯỚC 2: Google Geocoding API (với bộ lọc PostalCode và Country:DE nếu có key) ---
           const apiKey = (googleRoutesApiKey || "").trim();
-          if (apiKey && apiKey.length >= 10 && canUseGoogleMonthly("geocode", GOOGLE_GEOCODE_MONTHLY_LIMIT) && Date.now() >= googleGeocodeSuspendedUntil) {
+          const orderStatus = String(order?.status || "").toLowerCase();
+          const canUseGoogle = apiKey && apiKey.length >= 10 && orderStatus !== "complete" && orderStatus !== "cancel" && canUseGoogleMonthly("geocode", GOOGLE_GEOCODE_MONTHLY_LIMIT) && Date.now() >= googleGeocodeSuspendedUntil;
+
+          if (canUseGoogle) {
             try {
               const queryAddr = rawAddress.includes("Halle") || rawAddress.includes("061")
-                ? `${rawAddress}, Germany`
-                : `${rawAddress}, Halle (Saale), Germany`;
+                ? `${rawAddress} ${districtHint}, Germany`
+                : `${rawAddress} ${districtHint}, Halle (Saale), Germany`;
 
               const components = ["country:DE"];
               if (postcode) components.push(`postal_code:${postcode}`);
@@ -2567,7 +2572,7 @@
 
           // --- BƯỚC 3: Photon tìm kiếm toàn nước Đức nếu địa chỉ ở xa ngoài 20km ---
           try {
-            const globalQuery = [street, houseNum, postcode, city, "Germany"].filter(Boolean).join(" ");
+            const globalQuery = [street, houseNum, postcode, city, districtHint, "Germany"].filter(Boolean).join(" ");
             const globalUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(globalQuery)}&limit=1`;
             const gRes = await fetch(globalUrl);
             if (gRes.ok) {
