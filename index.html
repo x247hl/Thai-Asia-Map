@@ -2654,7 +2654,7 @@
       // Mặc định trên bản đồ luôn chỉ hiện đơn giao hàng
       orders = orders.filter(order => order.shipping_method === "home_delivery");
 
-      // Tự động chuẩn hóa & sửa tọa độ chính xác từng số nhà bằng Hệ thống Geocoding đa tầng
+      // Tự động chuẩn hóa & sửa tọa độ chính xác từng số nhà bằng Hệ thống Geocoding đa tầng (OSM + Google)
       await Promise.all(
         orders.map(async order => {
           try {
@@ -2668,6 +2668,7 @@
 
               order.latitude = geo.lat;
               order.longitude = geo.lng;
+              order._googleGeocoded = true;
               order._geoFixed = isFixed;
               order._geoSource = geo.source;
               order._geoAccuracy = geo.locationType || "ROOFTOP";
@@ -2675,6 +2676,8 @@
               if (isFixed) {
                 console.log(`📍 [Định vị GPS chuẩn] Đơn #${order.code} (${formatOrderAddress(order)}): lệch cũ ~${Math.round(Math.max(diffLat, diffLng) * 111000)}m -> Tọa độ mới [${geo.lat}, ${geo.lng}] (Nguồn: ${geo.source})`);
               }
+            } else {
+              order._googleGeocoded = false;
             }
           } catch (e) { }
         })
