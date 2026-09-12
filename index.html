@@ -2418,7 +2418,11 @@
 
     const googleGeocodeMemCache = new Map();
     const googleGeocodeInFlight = new Map();
-    let googleGeocodeSuspendedUntil = 0; // Tự động ngắt Google GPS khi hết lượt và tự khôi phục
+    let googleGeocodeSuspendedUntil = 0;
+
+    const OSM_GEOCODE_CENTER_LAT = 51.4654;
+    const OSM_GEOCODE_CENTER_LON = 11.9961;
+    const OSM_GEOCODE_BBOX_20KM = "11.70,51.28,12.29,51.65";
 
     function normalizeAddressForGeocode(addr) {
       return String(addr || "")
@@ -2442,7 +2446,7 @@
       const normKey = normalizeAddressForGeocode(rawAddress);
       if (!normKey) return null;
 
-      // 1. Kiểm tra RAM Cache (cực nhanh, 0ms)
+      // 1. Kiểm tra RAM Cache (0ms)
       if (googleGeocodeMemCache.has(normKey)) {
         return googleGeocodeMemCache.get(normKey);
       }
@@ -2460,11 +2464,6 @@
         }
       } catch (e) { }
 
-      // Nếu đang trong thời gian tạm ngắt Google GPS do hết lượt -> dùng ngay tọa độ gốc của server
-      if (Date.now() < googleGeocodeSuspendedUntil) {
-        return null;
-      }
-
       // 3. Chống gọi trùng khi nhiều đơn cùng địa chỉ đang tải đồng thời
       if (googleGeocodeInFlight.has(normKey)) {
         return googleGeocodeInFlight.get(normKey);
@@ -2474,60 +2473,126 @@
         return null;
       }
 
-      if (!canUseGoogleMonthly("geocode", GOOGLE_GEOCODE_MONTHLY_LIMIT)) {
-        console.warn(`[Google GPS] Monthly geocode limit reached (${GOOGLE_GEOCODE_MONTHLY_LIMIT}). Using backend coordinates until next month.`);
-        return null;
-      }
+      const street = String(order.address || "").trim();
+      const houseNum = String(order.apartment_number || order.house_number || "").trim();
+      const postcode = String(order.postcode || "").trim();
+      const city = String(order.city || "").trim();
 
-      const apiKey = (googleRoutesApiKey || "").trim();
-      if (!apiKey || apiKey.length < 10) {
-        return null;
-      }
-
-      // 4. Gọi Google Geocoding API đúng 1 lần duy nhất cho địa chỉ mới
       const promise = (async () => {
         try {
-          const queryAddr = rawAddress.includes("Halle") || rawAddress.includes("061")
-            ? `${rawAddress}, Germany`
-            : `${rawAddress}, Halle (Saale), Germany`;
+          // --- BƯỚC 1: Tìm kiếm chính xác với OpenStreetMap Photon (Khóa phạm vi 20km quanh quán) ---
+          // Tự động phân biệt chính xác từng làng (Zwebendorf vs Maschwitz, Reußen, Oppin,...)
+          try {
+            const photonQuery = [street, houseNum, postcode, city].filter(Boolean).join(" ");
+            const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
+              photonQuery
+            )}&lat=${OSM_GEOCODE_CENTER_LAT}&lon=${OSM_GEOCODE_CENTER_LON}&bbox=${OSM_GEOCODE_BBOX_20KM}&limit=3`;
 
-          const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryAddr)}&key=${apiKey}&language=vi`;
-          markGoogleMonthlyUse("geocode");
-          const res = await fetch(url);
-          if (res.status === 429 || res.status === 403) {
-            // Hết hạn mức hoặc bị giới hạn -> Tự động tắt Google GPS 15 phút, chuyển về tọa độ cũ
-            googleGeocodeSuspendedUntil = Date.now() + 15 * 60 * 1000;
-            console.warn("⚠️ [Google GPS] Đã chạm hạn mức Google (HTTP " + res.status + "). Tự động tắt Google GPS và dùng tọa độ cũ, tự khôi phục sau 15 phút.");
-            return null;
+            const pRes = await fetch(photonUrl);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              if (pData && Array.isArray(pData.features) && pData.features.length > 0) {
+                // Ưu tiên feature khớp chính xác số nhà
+                const exact = pData.features.find(
+                  f => f.properties?.housenumber?.toLowerCase() === houseNum.toLowerCase()
+                );
+                const chosen = exact || pData.features[0];
+                const coords = chosen.geometry?.coordinates;
+                if (coords && coords.length >= 2) {
+                  const result = {
+                    lat: coords[1],
+                    lng: coords[0],
+                    formattedAddress: `${chosen.properties?.street || street} ${chosen.properties?.housenumber || houseNum}, ${chosen.properties?.postcode || postcode} ${chosen.properties?.city || city}`,
+                    locationType: chosen.properties?.housenumber ? "ROOFTOP" : "RANGE_INTERPOLATED",
+                    district: chosen.properties?.district || chosen.properties?.suburb || "",
+                    source: "osm_photon"
+                  };
+                  googleGeocodeMemCache.set(normKey, result);
+                  try {
+                    localStorage.setItem(storageKey, JSON.stringify(result));
+                  } catch (e) { }
+                  return result;
+                }
+              }
+            }
+          } catch (osmErr) {
+            console.warn("OSM Photon geocode error:", osmErr);
           }
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
 
-          if (data && (data.status === "OVER_QUERY_LIMIT" || data.status === "RESOURCE_EXHAUSTED" || data.status === "REQUEST_DENIED")) {
-            // Google báo hết quota -> Tự động tắt Google GPS 15 phút, chuyển về dùng như cũ
-            googleGeocodeSuspendedUntil = Date.now() + 15 * 60 * 1000;
-            console.warn(`⚠️ [Google GPS] Quota Google tạm hết (${data.status}). Tự động tắt Google GPS và dùng tọa độ cũ, tự khôi phục sau 15 phút.`);
-            return null;
-          }
+          // --- BƯỚC 2: Google Geocoding API (với bộ lọc PostalCode và Country:DE nếu có key) ---
+          const apiKey = (googleRoutesApiKey || "").trim();
+          if (apiKey && apiKey.length >= 10 && canUseGoogleMonthly("geocode", GOOGLE_GEOCODE_MONTHLY_LIMIT) && Date.now() >= googleGeocodeSuspendedUntil) {
+            try {
+              const queryAddr = rawAddress.includes("Halle") || rawAddress.includes("061")
+                ? `${rawAddress}, Germany`
+                : `${rawAddress}, Halle (Saale), Germany`;
 
-          if (data && data.status === "OK" && Array.isArray(data.results) && data.results.length > 0) {
-            const loc = data.results[0].geometry?.location;
-            if (loc && typeof loc.lat === "number" && typeof loc.lng === "number") {
-              const result = {
-                lat: loc.lat,
-                lng: loc.lng,
-                formattedAddress: data.results[0].formatted_address || rawAddress,
-                locationType: data.results[0].geometry?.location_type || "ROOFTOP",
-                source: "google"
-              };
-              googleGeocodeMemCache.set(normKey, result);
-              try {
-                localStorage.setItem(storageKey, JSON.stringify(result));
-              } catch (e) { }
-              return result;
+              const components = ["country:DE"];
+              if (postcode) components.push(`postal_code:${postcode}`);
+
+              const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+                queryAddr
+              )}&components=${encodeURIComponent(components.join("|"))}&key=${apiKey}&language=de`;
+
+              markGoogleMonthlyUse("geocode");
+              const res = await fetch(url);
+              if (res.status === 429 || res.status === 403) {
+                googleGeocodeSuspendedUntil = Date.now() + 15 * 60 * 1000;
+              } else if (res.ok) {
+                const data = await res.json();
+                if (data && (data.status === "OVER_QUERY_LIMIT" || data.status === "RESOURCE_EXHAUSTED" || data.status === "REQUEST_DENIED")) {
+                  googleGeocodeSuspendedUntil = Date.now() + 15 * 60 * 1000;
+                } else if (data && data.status === "OK" && Array.isArray(data.results) && data.results.length > 0) {
+                  const loc = data.results[0].geometry?.location;
+                  if (loc && typeof loc.lat === "number" && typeof loc.lng === "number") {
+                    const result = {
+                      lat: loc.lat,
+                      lng: loc.lng,
+                      formattedAddress: data.results[0].formatted_address || rawAddress,
+                      locationType: data.results[0].geometry?.location_type || "ROOFTOP",
+                      source: "google"
+                    };
+                    googleGeocodeMemCache.set(normKey, result);
+                    try {
+                      localStorage.setItem(storageKey, JSON.stringify(result));
+                    } catch (e) { }
+                    return result;
+                  }
+                }
+              }
+            } catch (googleErr) {
+              console.warn("Google Geocoding error:", googleErr);
             }
           }
-          // Nếu địa chỉ không tìm thấy trên Google, lưu cache fallback để không gọi lại lặp đi lặp lại
+
+          // --- BƯỚC 3: Photon tìm kiếm toàn nước Đức nếu địa chỉ ở xa ngoài 20km ---
+          try {
+            const globalQuery = [street, houseNum, postcode, city, "Germany"].filter(Boolean).join(" ");
+            const globalUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(globalQuery)}&limit=1`;
+            const gRes = await fetch(globalUrl);
+            if (gRes.ok) {
+              const gData = await gRes.json();
+              if (gData && Array.isArray(gData.features) && gData.features.length > 0) {
+                const coords = gData.features[0].geometry?.coordinates;
+                if (coords && coords.length >= 2) {
+                  const result = {
+                    lat: coords[1],
+                    lng: coords[0],
+                    formattedAddress: rawAddress,
+                    locationType: "APPROXIMATE",
+                    source: "osm_global"
+                  };
+                  googleGeocodeMemCache.set(normKey, result);
+                  try {
+                    localStorage.setItem(storageKey, JSON.stringify(result));
+                  } catch (e) { }
+                  return result;
+                }
+              }
+            }
+          } catch (e) { }
+
+          // --- BƯỚC 4: Fallback tọa độ gốc từ backend ---
           const fallbackResult = {
             lat: toNumber(order.latitude),
             lng: toNumber(order.longitude),
@@ -2540,7 +2605,7 @@
           } catch (e) { }
           return fallbackResult;
         } catch (err) {
-          console.warn("Geocoding Google failed:", rawAddress, err);
+          console.warn("Geocoding failed for:", rawAddress, err);
           return null;
         } finally {
           googleGeocodeInFlight.delete(normKey);
@@ -2584,29 +2649,27 @@
       // Mặc định trên bản đồ luôn chỉ hiện đơn giao hàng
       orders = orders.filter(order => order.shipping_method === "home_delivery");
 
-      // Tự động chuẩn hóa & sửa tọa độ chính xác từng số nhà bằng Google Geocoding
+      // Tự động chuẩn hóa & sửa tọa độ chính xác từng số nhà bằng Hệ thống Geocoding đa tầng
       await Promise.all(
         orders.map(async order => {
           try {
             const rawLat = toNumber(order.latitude);
             const rawLng = toNumber(order.longitude);
             const geo = await geocodeOrderAddress(order);
-            if (geo && typeof geo.lat === "number" && typeof geo.lng === "number" && geo.source === "google") {
+            if (geo && typeof geo.lat === "number" && typeof geo.lng === "number" && geo.source !== "backend_fallback") {
               const diffLat = rawLat !== null ? Math.abs(rawLat - geo.lat) : 1;
               const diffLng = rawLng !== null ? Math.abs(rawLng - geo.lng) : 1;
               const isFixed = diffLat > 0.0001 || diffLng > 0.0001;
 
               order.latitude = geo.lat;
               order.longitude = geo.lng;
-              order._googleGeocoded = true;
-              order._geoAccuracy = geo.locationType || "ROOFTOP";
               order._geoFixed = isFixed;
+              order._geoSource = geo.source;
+              order._geoAccuracy = geo.locationType || "ROOFTOP";
 
               if (isFixed) {
-                console.log(`📍 [Google GPS] Đã định vị chuẩn số nhà đơn #${order.code} (${formatOrderAddress(order)}): lệch cũ ~${Math.round(Math.max(diffLat, diffLng) * 111000)}m -> Tọa độ mới Google: [${geo.lat}, ${geo.lng}]`);
+                console.log(`📍 [Định vị GPS chuẩn] Đơn #${order.code} (${formatOrderAddress(order)}): lệch cũ ~${Math.round(Math.max(diffLat, diffLng) * 111000)}m -> Tọa độ mới [${geo.lat}, ${geo.lng}] (Nguồn: ${geo.source})`);
               }
-            } else {
-              order._googleGeocoded = false;
             }
           } catch (e) { }
         })
